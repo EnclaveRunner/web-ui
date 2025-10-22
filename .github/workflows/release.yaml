@@ -21,10 +21,59 @@ jobs:
           fetch-depth: 0
 
       - name: Get next version
-        uses: thenativeweb/get-next-version@main
         id: version
-        with:
-          prefix: "v"
+        run: |
+          # Get the latest tag, or default to v0.0.0 if none exists
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Extract version numbers
+          VERSION=${LATEST_TAG#v}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          PATCH=$(echo $VERSION | cut -d. -f3)
+          
+          # Check if there are commits since the last tag
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS_COUNT=$(git rev-list --count HEAD)
+          else
+            COMMITS_COUNT=$(git rev-list --count ${LATEST_TAG}..HEAD)
+          fi
+          
+          echo "Commits since last tag: $COMMITS_COUNT"
+          
+          if [ $COMMITS_COUNT -gt 0 ]; then
+            # Check commit messages for version bump type
+            if [ "$LATEST_TAG" = "v0.0.0" ]; then
+              COMMIT_MESSAGES=$(git log --pretty=format:"%s" HEAD)
+            else
+              COMMIT_MESSAGES=$(git log --pretty=format:"%s" ${LATEST_TAG}..HEAD)
+            fi
+            
+            echo "Commit messages:"
+            echo "$COMMIT_MESSAGES"
+            
+            # Determine version bump type
+            if echo "$COMMIT_MESSAGES" | grep -q "BREAKING CHANGE\|!:"; then
+              NEW_MAJOR=$((MAJOR + 1))
+              NEW_VERSION="v${NEW_MAJOR}.0.0"
+            elif echo "$COMMIT_MESSAGES" | grep -q "^feat\|^feature"; then
+              NEW_MINOR=$((MINOR + 1))
+              NEW_VERSION="v${MAJOR}.${NEW_MINOR}.0"
+            else
+              NEW_PATCH=$((PATCH + 1))
+              NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+            fi
+            
+            echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "hasNextVersion=true" >> $GITHUB_OUTPUT
+            echo "New version will be: $NEW_VERSION"
+          else
+            echo "version=$LATEST_TAG" >> $GITHUB_OUTPUT
+            echo "hasNextVersion=false" >> $GITHUB_OUTPUT
+            echo "No commits since last tag, no new version needed"
+          fi
+          
       - name: Tag commit
         if: steps.version.outputs.hasNextVersion == 'true'
         run: |
@@ -80,6 +129,6 @@ jobs:
           name: "Release ${{ needs.update-version.outputs.tag }}"
           tag: "${{ needs.update-version.outputs.tag }}"
           bodyFile: ${{ steps.release-notes.outputs.release_notes_file }}
-          token: ${{ secrets.BOT_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           draft: false
           prerelease: false

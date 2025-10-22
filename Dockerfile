@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including dev dependencies for building)
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -28,5 +28,5 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Expose port 80
 EXPOSE 80
 
-# Start nginx
+# Start nginx server
 CMD ["nginx", "-g", "daemon off;"]
