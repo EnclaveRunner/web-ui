@@ -1,5 +1,6 @@
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -9,22 +10,119 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Settings() {
-  const { user } = useAuth();
+  const {
+    user,
+    updateUsername,
+    updateDisplayName,
+    updatePassword,
+    deleteAccount,
+  } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [name, setName] = useState(user?.name || "");
+  const [displayName, setDisplayName] = useState(user?.displayName || "");
+
+  // Update form state when user data changes
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setDisplayName(user.displayName);
+    }
+  }, [user]);
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Password validation
+  const passwordsMatch = newPassword === confirmPassword;
+  const passwordNotWSOnly = newPassword.trim().length > 0;
+  const isPasswordFormValid =
+    currentPassword &&
+    newPassword &&
+    confirmPassword &&
+    passwordsMatch &&
+    passwordNotWSOnly;
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      // Update username if it changed
+      if (name !== user?.name) {
+        await updateUsername(name);
+      }
 
-    setIsLoading(false);
-    // Show success message or handle errors
+      // Update display name if it changed
+      if (displayName !== user?.displayName) {
+        await updateDisplayName(displayName);
+      }
+
+      toast.success("Profile updated successfully!", {
+        description: "Your profile information has been updated.",
+      });
+    } catch (error) {
+      toast.error("Failed to update profile", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isPasswordFormValid) return;
+
+    setIsPasswordLoading(true);
+
+    try {
+      await updatePassword(currentPassword, newPassword);
+      toast.success("Password updated successfully!", {
+        description: "Your password has been changed.",
+      });
+      // Clear the form
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      toast.error("Failed to update password", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsPasswordLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      await deleteAccount();
+      toast.success("Account deleted successfully!", {
+        description: "Your account has been permanently deleted.",
+      });
+      // Navigation will be handled automatically by the 401 response in utils.ts
+    } catch (error) {
+      toast.error("Failed to delete account", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   };
 
   return (
@@ -43,26 +141,30 @@ export default function Settings() {
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
               <CardDescription>
-                Update your personal information and account details.
+                Update your username and display name.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Display Name</Label>
+                  <div className="space-y-2 max-w-xs">
+                    <Label htmlFor="name">Username</Label>
                     <Input
                       id="name"
-                      defaultValue={user?.name || ""}
-                      placeholder="Enter your name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your username"
+                      className="w-full"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
+                  <div className="space-y-2 max-w-xs">
+                    <Label htmlFor="displayName">Display Name</Label>
                     <Input
-                      id="username"
-                      defaultValue={user?.username || ""}
-                      placeholder="Enter your username"
+                      id="displayName"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder="Enter your display name"
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -82,35 +184,62 @@ export default function Settings() {
                 Manage your password and security preferences.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Current Password</Label>
-                <Input
-                  id="current-password"
-                  type="password"
-                  placeholder="Enter current password"
-                />
-              </div>
+            <CardContent>
+              <form onSubmit={handlePasswordChange} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
+                  <Input
+                    id="current-password"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    required
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="new-password">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  placeholder="Enter new password"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    required
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  placeholder="Confirm new password"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className={
+                      confirmPassword && !passwordsMatch
+                        ? "border-red-500 focus:border-red-500"
+                        : ""
+                    }
+                    required
+                  />
+                  {confirmPassword && !passwordsMatch && (
+                    <p className="text-sm text-red-600">
+                      Passwords do not match
+                    </p>
+                  )}
+                </div>
 
-              <Button variant="outline">Update Password</Button>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  disabled={!isPasswordFormValid || isPasswordLoading}
+                >
+                  {isPasswordLoading ? "Updating..." : "Update Password"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
 
@@ -130,9 +259,33 @@ export default function Settings() {
                     Once you delete your account, there is no going back. Please
                     be certain.
                   </p>
-                  <Button variant="destructive" size="sm">
-                    Delete Account
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        Delete Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Are you absolutely sure?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently
+                          delete your account.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-white hover:bg-destructive/90"
+                          onClick={handleDeleteAccount}
+                        >
+                          Yes, delete my account
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </CardContent>

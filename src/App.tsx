@@ -8,7 +8,8 @@ import { Suspense } from "react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ThemeProvider } from "./components/theme-provider";
-import { routes } from "./config/routes";
+import { Toaster } from "./components/ui/sonner";
+import { routes } from "./config/app-routes";
 
 // Loading component for lazy-loaded pages
 function PageLoader() {
@@ -46,6 +47,7 @@ function App() {
             </Routes>
           </Suspense>
         </Router>
+        <Toaster position="top-center" />
       </AuthProvider>
     </ThemeProvider>
   );

@@ -37,10 +37,10 @@ export default function Login() {
     setError("");
     setLoginLoading(true);
 
-    const success = await login(username, password);
+    const result = await login(username, password);
 
-    if (!success) {
-      setError("Invalid credentials. Please try again.");
+    if (!result.success) {
+      setError(result.error || "Login failed. Please try again.");
     }
 
     setLoginLoading(false);

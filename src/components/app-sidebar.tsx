@@ -1,24 +1,17 @@
 import * as React from "react";
 import {
-  IconCamera,
-  IconChartBar,
   IconDashboard,
   IconDatabase,
-  IconFileAi,
-  IconFileDescription,
   IconFileWord,
-  IconFolder,
   IconHelp,
   IconInnerShadowTop,
-  IconListDetails,
   IconReport,
   IconSearch,
   IconSettings,
-  IconUsers,
   type Icon,
 } from "@tabler/icons-react";
 
-import { NavDocuments } from "@/components/nav-documents";
+import { NavIAM } from "@/components/nav-iam";
 import { NavMain } from "@/components/nav-main";
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
@@ -35,7 +28,7 @@ import {
 export interface SidebarData {
   user: {
     name: string;
-    email: string;
+    displayName: string;
     avatar: string;
   };
   company: {
@@ -48,22 +41,12 @@ export interface SidebarData {
     url: string;
     icon?: Icon;
   }>;
-  navClouds?: Array<{
-    title: string;
-    icon: Icon;
-    isActive?: boolean;
-    url: string;
-    items?: Array<{
-      title: string;
-      url: string;
-    }>;
-  }>;
   navSecondary: Array<{
     title: string;
     url: string;
     icon: Icon;
   }>;
-  documents: Array<{
+  navIAM: Array<{
     name: string;
     url: string;
     icon: Icon;
@@ -77,8 +60,8 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 // Default data as fallback
 const defaultData: SidebarData = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
+    name: "guest",
+    displayName: "Guest User",
     avatar: "/avatars/shadcn.jpg",
   },
   company: {
@@ -90,74 +73,6 @@ const defaultData: SidebarData = {
       title: "Dashboard",
       url: "#",
       icon: IconDashboard,
-    },
-    {
-      title: "Lifecycle",
-      url: "#",
-      icon: IconListDetails,
-    },
-    {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
-    },
-    {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
     },
   ],
   navSecondary: [
@@ -177,7 +92,7 @@ const defaultData: SidebarData = {
       icon: IconSearch,
     },
   ],
-  documents: [
+  navIAM: [
     {
       name: "Data Library",
       url: "#",
@@ -228,8 +143,8 @@ export function AppSidebar({ data = defaultData, ...props }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        {data.documents && data.documents.length > 0 && (
-          <NavDocuments items={data.documents} />
+        {data.navIAM && data.navIAM.length > 0 && (
+          <NavIAM items={data.navIAM} />
         )}
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

@@ -2,7 +2,7 @@ import { AppSidebar, type SidebarData } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
-import { navigationConfig } from "@/config/navigation";
+import { getNavigationConfig } from "@/config/app-routes";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -14,24 +14,21 @@ export function DashboardLayout({
   title = "Dashboard",
 }: DashboardLayoutProps) {
   const { user } = useAuth();
+  const navigationConfig = getNavigationConfig();
 
-  const sidebarData: SidebarData = {
+  const data: SidebarData = {
     user: {
-      name: user?.name || "Demo User",
-      email: user?.username || "demo@enclave.com",
-      avatar: "",
+      name: user?.name ?? "User",
+      displayName: user?.displayName ?? "User",
+      avatar: "/avatars/shadcn.jpg",
     },
     company: {
       name: "Enclave Console",
       logoImage: "/enclave-logo.png",
     },
     navMain: navigationConfig.main,
+    navIAM: navigationConfig.navIAM,
     navSecondary: navigationConfig.secondary,
-    documents: navigationConfig.documents.map((item) => ({
-      name: item.title,
-      url: item.url,
-      icon: item.icon,
-    })),
   };
 
   return (
@@ -43,7 +40,7 @@ export function DashboardLayout({
         } as React.CSSProperties
       }
     >
-      <AppSidebar variant="inset" data={sidebarData} />
+      <AppSidebar variant="inset" data={data} />
       <SidebarInset>
         <SiteHeader title={title} />
         <div className="flex flex-1 flex-col">

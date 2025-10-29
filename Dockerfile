@@ -22,11 +22,10 @@ FROM nginx:alpine AS production
 # Copy built application from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy nginx template - nginx will automatically substitute environment variables
+COPY default.conf.template /etc/nginx/templates/
 
-# Expose port 80
-EXPOSE 80
+EXPOSE 8091
 
-# Start nginx server
+# nginx automatically processes templates in /etc/nginx/templates/ with envsubst
 CMD ["nginx", "-g", "daemon off;"]
