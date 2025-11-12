@@ -14,8 +14,18 @@ import { routes } from "./config/app-routes";
 // Loading component for lazy-loaded pages
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <div className="min-h-screen flex flex-col items-center justify-center">
+      <div className="relative h-24 w-24 flex items-center justify-center mb-4">
+        <div className="absolute inset-0 animate-spin rounded-full border-4 border-b-2 border-primary"></div>
+        <img
+          src="/enclave-logo.png"
+          alt="Enclave Logo"
+          className="relative w-90"
+        />
+      </div>
+      <span className="text-lg text-muted-foreground text-center">
+        Getting things ready for you...
+      </span>
     </div>
   );
 }
