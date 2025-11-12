@@ -5,6 +5,13 @@ import { toast } from "sonner";
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,8 +79,12 @@ import {
   deleteRbacResourceGroup,
   getRbacResourceGroup,
   getUsersUser,
+  getRbacPolicy,
+  postRbacPolicy,
+  deleteRbacPolicy,
 } from "../client";
 import { client } from "../client/client.gen";
+import type { RbacPolicy } from "../client";
 
 // ===== TYPES =====
 interface UserDetail {
@@ -149,7 +160,9 @@ export default function RoleManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [hasAccess, setHasAccess] = useState(true);
-  const [activeTab, setActiveTab] = useState<"roles" | "groups">("roles");
+  const [activeTab, setActiveTab] = useState<"roles" | "groups" | "policies">(
+    "roles"
+  );
 
   // Roles state
   const [roles, setRoles] = useState<Role[]>([]);
@@ -164,6 +177,75 @@ export default function RoleManagement() {
   const [createGroupFormData, setCreateGroupFormData] =
     useState<CreateResourceGroupFormData>(EMPTY_RESOURCE_GROUP_FORM);
   const [groupLoading, setGroupLoading] = useState(false);
+
+  // Policies state
+  const [policies, setPolicies] = useState<RbacPolicy[]>([]);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [createPolicyDialogOpen, setCreatePolicyDialogOpen] = useState(false);
+  const [createPolicyFormData, setCreatePolicyFormData] = useState({
+    role: "",
+    resourceGroup: "",
+    permission: "*",
+  });
+  // ===== POLICIES =====
+  const loadPolicies = useCallback(async () => {
+    try {
+      configureClient();
+      setPolicyLoading(true);
+      const response = await getRbacPolicy();
+      if (response.data && Array.isArray(response.data)) {
+        setPolicies(response.data);
+      } else {
+        setPolicies([]);
+      }
+    } catch (error) {
+      setPolicies([]);
+      handleApiError(error, "Failed to load policies");
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, []);
+
+  const handleCreatePolicy = async () => {
+    const { role, resourceGroup, permission } = createPolicyFormData;
+    if (!role || !resourceGroup || !permission) {
+      toast.error("Please fill all fields");
+      return;
+    }
+    try {
+      setPolicyLoading(true);
+      configureClient();
+      await postRbacPolicy({
+        body: {
+          role,
+          resourceGroup,
+          permission: permission as RbacPolicy["permission"],
+        },
+      });
+      toast.success("Policy created successfully");
+      setCreatePolicyDialogOpen(false);
+      setCreatePolicyFormData({ role: "", resourceGroup: "", permission: "*" });
+      loadPolicies();
+    } catch (error) {
+      handleApiError(error, "Failed to create policy");
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
+  const handleDeletePolicy = async (policy: RbacPolicy) => {
+    try {
+      setPolicyLoading(true);
+      configureClient();
+      await deleteRbacPolicy({ body: policy });
+      toast.success("Policy deleted successfully");
+      loadPolicies();
+    } catch (error) {
+      handleApiError(error, "Failed to delete policy");
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
 
   // ===== DATA LOADING =====
   const loadRoles = useCallback(async () => {
@@ -273,6 +355,7 @@ export default function RoleManagement() {
 
   useEffect(() => {
     loadData();
+    loadPolicies();
   }, [loadData]);
 
   // ===== ROLE MANAGEMENT ACTIONS =====
@@ -477,6 +560,45 @@ export default function RoleManagement() {
     return role.name.toLowerCase().includes(searchLower);
   });
 
+  // Edit Policy Dialog State
+  const [editPolicyDialogOpen, setEditPolicyDialogOpen] = useState(false);
+  const [editPolicyFormData, setEditPolicyFormData] =
+    useState<RbacPolicy | null>(null);
+
+  const handleEditPolicy = (policy: RbacPolicy) => {
+    setEditPolicyFormData(policy);
+    setEditPolicyDialogOpen(true);
+  };
+
+  // Filtered policies for search
+  const filteredPolicies = policies.filter((policy: RbacPolicy) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      policy.role.toLowerCase().includes(searchLower) ||
+      policy.resourceGroup.toLowerCase().includes(searchLower) ||
+      policy.permission.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const handleUpdatePolicy = async () => {
+    if (!editPolicyFormData) return;
+    try {
+      setPolicyLoading(true);
+      configureClient();
+      // Remove old policy, then add new one
+      await deleteRbacPolicy({ body: editPolicyFormData });
+      await postRbacPolicy({ body: editPolicyFormData });
+      toast.success("Policy updated successfully");
+      setEditPolicyDialogOpen(false);
+      setEditPolicyFormData(null);
+      loadPolicies();
+    } catch (error) {
+      handleApiError(error, "Failed to update policy");
+    } finally {
+      setPolicyLoading(false);
+    }
+  };
+
   const filteredResourceGroups = resourceGroups.filter((group) => {
     const searchLower = searchTerm.toLowerCase();
     return group.name.toLowerCase().includes(searchLower);
@@ -581,14 +703,18 @@ export default function RoleManagement() {
             setActiveTab(value as "roles" | "groups")
           }
         >
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="roles" className="flex items-center gap-2">
-              <IconShield className="h-4 w-4" />
+              <IconUsers className="h-4 w-4" />
               Roles ({filteredRoles.length})
             </TabsTrigger>
             <TabsTrigger value="groups" className="flex items-center gap-2">
               <IconDatabase className="h-4 w-4" />
               Resource Groups ({filteredResourceGroups.length})
+            </TabsTrigger>
+            <TabsTrigger value="policies" className="flex items-center gap-2">
+              <IconShield className="h-4 w-4" />
+              Policies ({policies.length})
             </TabsTrigger>
           </TabsList>
 
@@ -656,7 +782,7 @@ export default function RoleManagement() {
               <CardContent className="p-0">
                 {filteredRoles.length === 0 ? (
                   <div className="text-center py-8">
-                    <IconShield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <IconUsers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-medium">No roles found</h3>
                     <p className="text-muted-foreground">
                       {searchTerm
@@ -793,6 +919,321 @@ export default function RoleManagement() {
           </TabsContent>
 
           {/* Resource Groups Tab */}
+          {/* Policies Tab */}
+          <TabsContent value="policies" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Policies</h3>
+                <p className="text-muted-foreground">
+                  Map roles to resource groups and manage permissions
+                </p>
+              </div>
+              <Dialog
+                open={createPolicyDialogOpen}
+                onOpenChange={setCreatePolicyDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button>
+                    <IconPlus className="h-4 w-4 mr-2" />
+                    Add Policy
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Policy</DialogTitle>
+                    <DialogDescription>
+                      Create a new policy mapping a role to a resource group and
+                      permission.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="policy-role" className="text-right">
+                        Role *
+                      </Label>
+                      <Select
+                        value={createPolicyFormData.role}
+                        onValueChange={(value) =>
+                          setCreatePolicyFormData((prev) => ({
+                            ...prev,
+                            role: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {roles.map((role) => (
+                            <SelectItem key={role.name} value={role.name}>
+                              {role.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="policy-group" className="text-right">
+                        Resource Group *
+                      </Label>
+                      <Select
+                        value={createPolicyFormData.resourceGroup}
+                        onValueChange={(value) =>
+                          setCreatePolicyFormData((prev) => ({
+                            ...prev,
+                            resourceGroup: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select resource group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {resourceGroups.map((group) => (
+                            <SelectItem key={group.name} value={group.name}>
+                              {group.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="policy-permission" className="text-right">
+                        Permission *
+                      </Label>
+                      <Select
+                        value={createPolicyFormData.permission}
+                        onValueChange={(value) =>
+                          setCreatePolicyFormData((prev) => ({
+                            ...prev,
+                            permission: value as RbacPolicy["permission"],
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Select permission" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="*">*</SelectItem>
+                          <SelectItem value="GET">GET</SelectItem>
+                          <SelectItem value="POST">POST</SelectItem>
+                          <SelectItem value="PATCH">PATCH</SelectItem>
+                          <SelectItem value="DELETE">DELETE</SelectItem>
+                          <SelectItem value="HEAD">HEAD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCreatePolicyDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleCreatePolicy}
+                      disabled={policyLoading}
+                    >
+                      {policyLoading ? "Creating..." : "Add Policy"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <Card>
+              <CardContent className="p-0">
+                {policyLoading ? (
+                  <div className="text-center py-8">Loading policies...</div>
+                ) : policies.length === 0 ? (
+                  <div className="text-center py-8">
+                    <IconShield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium">No policies found</h3>
+                    <p className="text-muted-foreground">
+                      {searchTerm
+                        ? "Try adjusting your search terms."
+                        : "Create your first policy to get started."}
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Resource Group</TableHead>
+                        <TableHead>Permission</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPolicies.map((policy: RbacPolicy) => (
+                        <TableRow
+                          key={
+                            policy.role +
+                            policy.resourceGroup +
+                            policy.permission
+                          }
+                        >
+                          <TableCell>{policy.role}</TableCell>
+                          <TableCell>{policy.resourceGroup}</TableCell>
+                          <TableCell>{policy.permission}</TableCell>
+                          <TableCell className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditPolicy(policy)}
+                              disabled={policyLoading}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeletePolicy(policy)}
+                              disabled={policyLoading}
+                            >
+                              Delete
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {/* Edit Policy Dialog */}
+                      <Dialog
+                        open={editPolicyDialogOpen}
+                        onOpenChange={setEditPolicyDialogOpen}
+                      >
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Edit Policy</DialogTitle>
+                            <DialogDescription>
+                              Modify the role, resource group, or permission for
+                              this policy.
+                            </DialogDescription>
+                          </DialogHeader>
+                          {editPolicyFormData && (
+                            <div className="grid gap-4 py-4">
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label
+                                  htmlFor="edit-policy-role"
+                                  className="text-right"
+                                >
+                                  Role *
+                                </Label>
+                                <Select
+                                  value={editPolicyFormData.role}
+                                  onValueChange={(value) =>
+                                    setEditPolicyFormData((prev) =>
+                                      prev ? { ...prev, role: value } : prev
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select role" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {roles.map((role) => (
+                                      <SelectItem
+                                        key={role.name}
+                                        value={role.name}
+                                      >
+                                        {role.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label
+                                  htmlFor="edit-policy-group"
+                                  className="text-right"
+                                >
+                                  Resource Group *
+                                </Label>
+                                <Select
+                                  value={editPolicyFormData.resourceGroup}
+                                  onValueChange={(value) =>
+                                    setEditPolicyFormData((prev) =>
+                                      prev
+                                        ? { ...prev, resourceGroup: value }
+                                        : prev
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select resource group" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {resourceGroups.map((group) => (
+                                      <SelectItem
+                                        key={group.name}
+                                        value={group.name}
+                                      >
+                                        {group.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="grid grid-cols-4 items-center gap-4">
+                                <Label
+                                  htmlFor="edit-policy-permission"
+                                  className="text-right"
+                                >
+                                  Permission *
+                                </Label>
+                                <Select
+                                  value={editPolicyFormData.permission}
+                                  onValueChange={(value) =>
+                                    setEditPolicyFormData((prev) =>
+                                      prev
+                                        ? {
+                                            ...prev,
+                                            permission:
+                                              value as RbacPolicy["permission"],
+                                          }
+                                        : prev
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="Select permission" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="*">*</SelectItem>
+                                    <SelectItem value="GET">GET</SelectItem>
+                                    <SelectItem value="POST">POST</SelectItem>
+                                    <SelectItem value="PATCH">PATCH</SelectItem>
+                                    <SelectItem value="DELETE">
+                                      DELETE
+                                    </SelectItem>
+                                    <SelectItem value="HEAD">HEAD</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          )}
+                          <DialogFooter>
+                            <Button
+                              variant="outline"
+                              onClick={() => setEditPolicyDialogOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleUpdatePolicy}
+                              disabled={policyLoading}
+                            >
+                              {policyLoading ? "Saving..." : "Save Changes"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
           <TabsContent value="groups" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -923,16 +1364,14 @@ export default function RoleManagement() {
                                         ) : group.endpoints &&
                                           group.endpoints.length > 0 ? (
                                           <div className="max-h-40 overflow-y-auto">
-                                            {group.endpoints.map(
-                                              (endpoint) => (
-                                                <div
-                                                  key={endpoint}
-                                                  className="text-sm py-2 px-3 bg-muted rounded mb-1 font-mono border text-foreground"
-                                                >
-                                                  {endpoint}
-                                                </div>
-                                              )
-                                            )}
+                                            {group.endpoints.map((endpoint) => (
+                                              <div
+                                                key={endpoint}
+                                                className="text-sm py-2 px-3 bg-muted rounded mb-1 font-mono border text-foreground"
+                                              >
+                                                {endpoint}
+                                              </div>
+                                            ))}
                                           </div>
                                         ) : (
                                           <p className="text-sm text-muted-foreground">
