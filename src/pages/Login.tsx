@@ -47,15 +47,17 @@ export default function Login() {
   };
 
   return (
-    <PageLayout showSidebar={false} className="bg-gray-50 relative">
+    <PageLayout showSidebar={false} className="bg-gray-50 dark:bg-background relative">
       {/* Top Left - Logo and Title */}
       <div className="absolute top-8 left-8 flex items-center space-x-3">
         <img
           src="/enclave-logo.png"
           alt="Enclave Logo"
-          className="h-10 w-auto"
+          className="h-15 w-auto"
         />
-        <h1 className="text-2xl font-bold text-gray-900">Enclave Console</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white drop-shadow">
+          Enclave Console
+        </h1>
       </div>
 
       {/* Login Form  */}

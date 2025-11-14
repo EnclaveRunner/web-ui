@@ -16,11 +16,11 @@ function PageLoader() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center">
       <div className="relative h-24 w-24 flex items-center justify-center mb-4">
-        <div className="absolute inset-0 animate-spin rounded-full border-4 border-b-2 border-primary"></div>
+        <div className="absolute inset-0 -m-1 h-26 w-26 animate-spin rounded-full border-4 border-b-2 border-primary"></div>
         <img
           src="/enclave-logo.png"
           alt="Enclave Logo"
-          className="relative w-90"
+          className="relative w-15"
         />
       </div>
       <span className="text-lg text-muted-foreground text-center">

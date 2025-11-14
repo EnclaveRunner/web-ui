@@ -128,7 +128,7 @@ export function AppSidebar({ data = defaultData, ...props }: AppSidebarProps) {
                   <img
                     src={data.company.logoImage}
                     alt={`${data.company.name} logo`}
-                    className="!size-10 object-contain"
+                    className="!size-8 object-contain"
                   />
                 ) : (
                   <LogoIcon className="!size-5" />
