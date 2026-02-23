@@ -1,4 +1,5 @@
 # Enclave Web UI - Docker Configuration
+
 ## Nginx Reverse Proxy Configuration
 
 This Docker container uses nginx as a reverse proxy. The frontend makes all API calls to `/api/*`, and nginx forwards them to the backend server. This eliminates CORS issues and provides a cleaner architecture.
