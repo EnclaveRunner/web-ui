@@ -1,6 +1,6 @@
 import { type ComponentType } from "react";
 import { lazy } from "react";
-import { type Icon } from "@tabler/icons-react";
+import { IconCube, type Icon } from "@tabler/icons-react";
 import {
   IconDashboard,
   IconSettings,
@@ -14,6 +14,8 @@ const Settings = lazy(() => import("../pages/Settings"));
 const Login = lazy(() => import("../pages/Login"));
 const UserManagement = lazy(() => import("../pages/UserManagement"));
 const RoleManagement = lazy(() => import("../pages/RoleManagement"));
+const Artifacts = lazy(() => import("../pages/Artifacts"));
+const Blueprint = lazy(() => import("../pages/Blueprint"));
 
 export interface AppRoute {
   path: string;
@@ -42,6 +44,15 @@ export const appRoutes: AppRoute[] = [
     order: 1,
   },
   {
+    path: "/artifacts",
+    component: Artifacts,
+    protected: true,
+    title: "Artifacts",
+    icon: IconCube,
+    navGroup: "main",
+    order: 2,
+  },
+  {
     path: "/users",
     component: UserManagement,
     protected: true,
@@ -67,6 +78,12 @@ export const appRoutes: AppRoute[] = [
     icon: IconSettings,
     navGroup: "secondary",
     order: 1,
+  },
+  {
+    path: "/blueprint/:artifactId",
+    component: Blueprint,
+    protected: true,
+    // No navigation properties - this is a detail page
   },
 ];
 

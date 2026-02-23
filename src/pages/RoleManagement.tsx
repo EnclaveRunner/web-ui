@@ -82,6 +82,7 @@ import {
   getRbacPolicy,
   postRbacPolicy,
   deleteRbacPolicy,
+  postRbacEndpoint,
 } from "../client";
 import { client } from "../client/client.gen";
 import type { RbacPolicy } from "../client";
@@ -113,6 +114,7 @@ interface CreateRoleFormData {
 
 interface CreateResourceGroupFormData {
   name: string;
+  endpoints: string[];
 }
 
 // ===== CONSTANTS =====
@@ -122,6 +124,7 @@ const EMPTY_ROLE_FORM: CreateRoleFormData = {
 
 const EMPTY_RESOURCE_GROUP_FORM: CreateResourceGroupFormData = {
   name: "",
+  endpoints: [],
 };
 
 // ===== UTILITY FUNCTIONS =====
@@ -398,7 +401,7 @@ export default function RoleManagement() {
 
   // ===== RESOURCE GROUP MANAGEMENT ACTIONS =====
   const handleCreateResourceGroup = async () => {
-    const { name } = createGroupFormData;
+    const { name, endpoints } = createGroupFormData;
 
     if (!name) {
       toast.error("Please enter a resource group name");
@@ -409,11 +412,26 @@ export default function RoleManagement() {
       setGroupLoading(true);
       configureClient();
 
+      // Create the resource group first
       await postRbacResourceGroup({
         body: { resourceGroup: name },
       });
 
-      toast.success("Resource group created successfully");
+      // Assign each selected endpoint to the resource group
+      if (endpoints.length > 0) {
+        await Promise.all(
+          endpoints.map((endpoint) =>
+            postRbacEndpoint({
+              body: {
+                resourceGroup: name,
+                endpoint,
+              },
+            })
+          )
+        );
+      }
+
+      toast.success(`Resource group created successfully${endpoints.length > 0 ? ` with ${endpoints.length} endpoint(s)` : ''}`);
       resetGroupForm();
       loadResourceGroups();
     } catch (error: unknown) {
@@ -1278,6 +1296,90 @@ export default function RoleManagement() {
                         className="col-span-3"
                         placeholder="Enter group name"
                       />
+                    </div>
+                    
+                    <div className="grid grid-cols-4 items-start gap-4">
+                      <Label htmlFor="group-endpoints" className="text-right pt-2">
+                        Endpoints
+                      </Label>
+                      <div className="col-span-3 space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Select from existing endpoints to assign to this resource group (optional)
+                        </p>
+                        
+                        {/* Get available endpoints from existing resource groups */}
+                        {(() => {
+                          const allEndpoints = new Set<string>();
+                          resourceGroups.forEach((group) => {
+                            if (group.endpoints && group.hasEndpointAccess) {
+                              group.endpoints.forEach((endpoint) => {
+                                allEndpoints.add(endpoint);
+                              });
+                            }
+                          });
+                          const availableEndpoints = Array.from(allEndpoints).sort();
+                          
+                          return availableEndpoints.length > 0 ? (
+                            <Select
+                              value=""
+                              onValueChange={(endpoint) => {
+                                if (endpoint && !createGroupFormData.endpoints.includes(endpoint)) {
+                                  setCreateGroupFormData((prev) => ({
+                                    ...prev,
+                                    endpoints: [...prev.endpoints, endpoint],
+                                  }));
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select an endpoint to add..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableEndpoints
+                                  .filter(endpoint => !createGroupFormData.endpoints.includes(endpoint))
+                                  .map((endpoint) => (
+                                    <SelectItem key={endpoint} value={endpoint}>
+                                      {endpoint}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <div className="text-sm text-muted-foreground p-2 border rounded">
+                              No endpoints available. Endpoints will appear here once they are assigned to existing resource groups.
+                            </div>
+                          );
+                        })()}
+                        
+                        {/* Selected endpoints */}
+                        {createGroupFormData.endpoints.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-sm font-medium">Selected endpoints:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {createGroupFormData.endpoints.map((endpoint) => (
+                                <Badge
+                                  key={endpoint}
+                                  variant="secondary"
+                                  className="flex items-center gap-1"
+                                >
+                                  {endpoint}
+                                  <button
+                                    onClick={() => {
+                                      setCreateGroupFormData((prev) => ({
+                                        ...prev,
+                                        endpoints: prev.endpoints.filter(ep => ep !== endpoint),
+                                      }));
+                                    }}
+                                    className="ml-1 hover:bg-red-100 rounded-full p-0.5"
+                                  >
+                                    ×
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
