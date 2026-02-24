@@ -184,12 +184,65 @@ export default function RoleManagement() {
   // Policies state
   const [policies, setPolicies] = useState<RbacPolicy[]>([]);
   const [policyLoading, setPolicyLoading] = useState(false);
+  const [discoveredEndpoints, setDiscoveredEndpoints] = useState<string[]>([]);
+  const [endpointsLoading, setEndpointsLoading] = useState(true);
   const [createPolicyDialogOpen, setCreatePolicyDialogOpen] = useState(false);
   const [createPolicyFormData, setCreatePolicyFormData] = useState({
     role: "",
     resourceGroup: "",
     permission: "*",
   });
+  // Function to discover endpoints from OpenAPI specification
+  const discoverEndpoints = useCallback(async () => {
+    try {
+      setEndpointsLoading(true);
+      // Fetch the OpenAPI specification
+      const response = await fetch('/openapi.yml');
+      if (!response.ok) {
+        throw new Error('Failed to fetch OpenAPI specification');
+      }
+      
+      const yamlText = await response.text();
+      
+      // Simple YAML parsing for paths section
+      // This is a basic parser focused on extracting endpoint paths
+      const pathsMatch = yamlText.match(/^paths:\s*([\s\S]*?)^(?:\w|$)/m);
+      if (!pathsMatch) {
+        throw new Error('No paths section found in OpenAPI spec');
+      }
+      
+      const pathsSection = pathsMatch[1];
+      const endpointMatches = pathsSection.match(/^\s{2}(\/[^:]+):/gm);
+      
+      if (endpointMatches) {
+        const endpoints = endpointMatches
+          .map(match => match.trim().replace(':', ''))
+          .filter(endpoint => endpoint.startsWith('/'))
+          .sort();
+        
+        setDiscoveredEndpoints(endpoints);
+      } else {
+        setDiscoveredEndpoints([]);
+      }
+    } catch (error) {
+      console.error('Error discovering endpoints:', error);
+      // Fallback to common endpoints if auto-discovery fails
+      setDiscoveredEndpoints([
+        '/users/user',
+        '/users/list',
+        '/artifacts/list',
+        '/artifacts/artifact',
+        '/tasks/list',
+        '/tasks/task',
+        '/rbac/roles',
+        '/rbac/policies',
+        '/rbac/resource-groups'
+      ]);
+    } finally {
+      setEndpointsLoading(false);
+    }
+  }, []);
+
   // ===== POLICIES =====
   const loadPolicies = useCallback(async () => {
     try {
@@ -359,7 +412,8 @@ export default function RoleManagement() {
   useEffect(() => {
     loadData();
     loadPolicies();
-  }, [loadData]);
+    discoverEndpoints();
+  }, [loadData, discoverEndpoints]);
 
   // ===== ROLE MANAGEMENT ACTIONS =====
   const handleCreateRole = async () => {
@@ -1304,22 +1358,33 @@ export default function RoleManagement() {
                       </Label>
                       <div className="col-span-3 space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          Select from existing endpoints to assign to this resource group (optional)
+                          Select from available API endpoints to assign to this resource group (auto-discovered from OpenAPI specification)
                         </p>
                         
-                        {/* Get available endpoints from existing resource groups */}
+                        {/* Available endpoints from OpenAPI specification */}
                         {(() => {
-                          const allEndpoints = new Set<string>();
+                          // Combine discovered endpoints with any existing ones from resource groups
+                          const existingEndpoints = new Set<string>();
                           resourceGroups.forEach((group) => {
                             if (group.endpoints && group.hasEndpointAccess) {
                               group.endpoints.forEach((endpoint) => {
-                                allEndpoints.add(endpoint);
+                                existingEndpoints.add(endpoint);
                               });
                             }
                           });
-                          const availableEndpoints = Array.from(allEndpoints).sort();
                           
-                          return availableEndpoints.length > 0 ? (
+                          // Merge discovered endpoints with existing ones, prioritizing discovered ones
+                          const allAvailableEndpoints = [...new Set([
+                            ...discoveredEndpoints,
+                            ...Array.from(existingEndpoints)
+                          ])].sort();
+                          
+                          return endpointsLoading ? (
+                            <div className="text-sm text-muted-foreground p-2 border rounded flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                              Loading available endpoints...
+                            </div>
+                          ) : allAvailableEndpoints.length > 0 ? (
                             <Select
                               value=""
                               onValueChange={(endpoint) => {
@@ -1335,18 +1400,28 @@ export default function RoleManagement() {
                                 <SelectValue placeholder="Select an endpoint to add..." />
                               </SelectTrigger>
                               <SelectContent>
-                                {availableEndpoints
+                                {allAvailableEndpoints
                                   .filter(endpoint => !createGroupFormData.endpoints.includes(endpoint))
-                                  .map((endpoint) => (
-                                    <SelectItem key={endpoint} value={endpoint}>
-                                      {endpoint}
-                                    </SelectItem>
-                                  ))}
+                                  .map((endpoint) => {
+                                    const isFromOpenAPI = discoveredEndpoints.includes(endpoint);
+                                    return (
+                                      <SelectItem key={endpoint} value={endpoint}>
+                                        <div className="flex items-center gap-2">
+                                          {endpoint}
+                                          {isFromOpenAPI && (
+                                            <Badge variant="outline" className="text-xs px-1 py-0">
+                                              API
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
                               </SelectContent>
                             </Select>
                           ) : (
                             <div className="text-sm text-muted-foreground p-2 border rounded">
-                              No endpoints available. Endpoints will appear here once they are assigned to existing resource groups.
+                              No endpoints available. There may be an issue loading the API specification.
                             </div>
                           );
                         })()}

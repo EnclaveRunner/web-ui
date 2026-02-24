@@ -6,6 +6,7 @@ import {
   IconSettings,
   IconUsers,
   IconShield,
+  IconActivity,
 } from "@tabler/icons-react";
 
 // Lazy load pages for better performance
@@ -16,6 +17,7 @@ const UserManagement = lazy(() => import("../pages/UserManagement"));
 const RoleManagement = lazy(() => import("../pages/RoleManagement"));
 const Artifacts = lazy(() => import("../pages/Artifacts"));
 const Blueprint = lazy(() => import("../pages/Blueprint"));
+const TaskOverview = lazy(() => import("../pages/TaskOverview"));
 
 export interface AppRoute {
   path: string;
@@ -51,6 +53,15 @@ export const appRoutes: AppRoute[] = [
     icon: IconCube,
     navGroup: "main",
     order: 2,
+  },
+  {
+    path: "/tasks",
+    component: TaskOverview,
+    protected: true,
+    title: "Tasks",
+    icon: IconActivity,
+    navGroup: "main",
+    order: 3,
   },
   {
     path: "/users",
