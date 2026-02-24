@@ -4,6 +4,45 @@ export type ClientOptions = {
     baseUrl: `${string}://openapi.yml` | (string & {});
 };
 
+export type TaskState = {
+    /**
+     * The unique identifier for the task.
+     */
+    id: string;
+    /**
+     * The timestamp when the task was created.
+     */
+    created_on: string;
+    /**
+     * The last action performed on the task.
+     */
+    last_action: string;
+    /**
+     * The host running the task.
+     */
+    runner_host: string;
+    /**
+     * The current number of retries.
+     */
+    retries: number;
+    /**
+     * The maximum number of retries allowed.
+     */
+    max_retries: number;
+    /**
+     * The retention period for the task.
+     */
+    retention: string;
+    /**
+     * The current status of the task.
+     */
+    status: string;
+    /**
+     * The result payload of the task.
+     */
+    result_payload: string;
+};
+
 export type ErrGeneric = {
     error: string;
 };
@@ -1786,7 +1825,7 @@ export type PostArtifactUploadData = {
         /**
          * Tags to assign to the artifact.
          */
-        tags?: Array<string>;
+        tag?: Array<string>;
         /**
          * The artifact file to upload.
          */
@@ -1929,3 +1968,86 @@ export type PostManifestResponses = {
 };
 
 export type PostManifestResponse = PostManifestResponses[keyof PostManifestResponses];
+
+export type GetTasksListData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/tasks/list';
+};
+
+export type GetTasksListErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetTasksListError = GetTasksListErrors[keyof GetTasksListErrors];
+
+export type GetTasksListResponses = {
+    /**
+     * Successful response with task list.
+     */
+    200: Array<TaskState>;
+};
+
+export type GetTasksListResponse = GetTasksListResponses[keyof GetTasksListResponses];
+
+export type GetTasksTaskData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * The unique identifier for the task to retrieve.
+         */
+        id: string;
+    };
+    url: '/tasks/task';
+};
+
+export type GetTasksTaskErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetTasksTaskError = GetTasksTaskErrors[keyof GetTasksTaskErrors];
+
+export type GetTasksTaskResponses = {
+    /**
+     * Successful response with task information.
+     */
+    200: TaskState;
+};
+
+export type GetTasksTaskResponse = GetTasksTaskResponses[keyof GetTasksTaskResponses];

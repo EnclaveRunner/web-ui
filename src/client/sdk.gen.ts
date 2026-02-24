@@ -2,7 +2,7 @@
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteArtifactData, DeleteArtifactErrors, DeleteArtifactResponses, DeleteArtifactTagData, DeleteArtifactTagErrors, DeleteArtifactTagResponses, DeleteRbacEndpointData, DeleteRbacEndpointErrors, DeleteRbacEndpointResponses, DeleteRbacPolicyData, DeleteRbacPolicyErrors, DeleteRbacPolicyResponses, DeleteRbacResourceGroupData, DeleteRbacResourceGroupErrors, DeleteRbacResourceGroupResponses, DeleteRbacRoleData, DeleteRbacRoleErrors, DeleteRbacRoleResponses, DeleteRbacUserData, DeleteRbacUserErrors, DeleteRbacUserResponses, DeleteUsersMeData, DeleteUsersMeErrors, DeleteUsersMeResponses, DeleteUsersUserData, DeleteUsersUserErrors, DeleteUsersUserResponses, GetArtifactData, GetArtifactErrors, GetArtifactListData, GetArtifactListErrors, GetArtifactListResponses, GetArtifactResponses, GetArtifactUploadData, GetArtifactUploadErrors, GetArtifactUploadResponses, GetRbacEndpointData, GetRbacEndpointErrors, GetRbacEndpointResponses, GetRbacListResourceGroupsData, GetRbacListResourceGroupsErrors, GetRbacListResourceGroupsResponses, GetRbacListRolesData, GetRbacListRolesErrors, GetRbacListRolesResponses, GetRbacPolicyData, GetRbacPolicyErrors, GetRbacPolicyResponses, GetRbacResourceGroupData, GetRbacResourceGroupErrors, GetRbacResourceGroupResponses, GetRbacRoleData, GetRbacRoleErrors, GetRbacRoleResponses, GetRbacUserData, GetRbacUserErrors, GetRbacUserResponses, GetUsersListData, GetUsersListErrors, GetUsersListResponses, GetUsersMeData, GetUsersMeErrors, GetUsersMeResponses, GetUsersUserData, GetUsersUserErrors, GetUsersUserResponses, HeadArtifactData, HeadArtifactErrors, HeadArtifactResponses, HeadRbacResourceGroupData, HeadRbacResourceGroupErrors, HeadRbacResourceGroupResponses, HeadRbacRoleData, HeadRbacRoleErrors, HeadRbacRoleResponses, HeadUsersUserData, HeadUsersUserErrors, HeadUsersUserResponses, PatchUsersMeData, PatchUsersMeErrors, PatchUsersMeResponses, PatchUsersUserData, PatchUsersUserErrors, PatchUsersUserResponses, PostArtifactTagData, PostArtifactTagErrors, PostArtifactTagResponses, PostArtifactUploadData, PostArtifactUploadErrors, PostArtifactUploadResponses, PostManifestData, PostManifestErrors, PostManifestResponses, PostRbacEndpointData, PostRbacEndpointErrors, PostRbacEndpointResponses, PostRbacPolicyData, PostRbacPolicyErrors, PostRbacPolicyResponses, PostRbacResourceGroupData, PostRbacResourceGroupErrors, PostRbacResourceGroupResponses, PostRbacRoleData, PostRbacRoleErrors, PostRbacRoleResponses, PostRbacUserData, PostRbacUserErrors, PostRbacUserResponses, PostUsersUserData, PostUsersUserErrors, PostUsersUserResponses } from './types.gen';
+import type { DeleteArtifactData, DeleteArtifactErrors, DeleteArtifactResponses, DeleteArtifactTagData, DeleteArtifactTagErrors, DeleteArtifactTagResponses, DeleteRbacEndpointData, DeleteRbacEndpointErrors, DeleteRbacEndpointResponses, DeleteRbacPolicyData, DeleteRbacPolicyErrors, DeleteRbacPolicyResponses, DeleteRbacResourceGroupData, DeleteRbacResourceGroupErrors, DeleteRbacResourceGroupResponses, DeleteRbacRoleData, DeleteRbacRoleErrors, DeleteRbacRoleResponses, DeleteRbacUserData, DeleteRbacUserErrors, DeleteRbacUserResponses, DeleteUsersMeData, DeleteUsersMeErrors, DeleteUsersMeResponses, DeleteUsersUserData, DeleteUsersUserErrors, DeleteUsersUserResponses, GetArtifactData, GetArtifactErrors, GetArtifactListData, GetArtifactListErrors, GetArtifactListResponses, GetArtifactResponses, GetArtifactUploadData, GetArtifactUploadErrors, GetArtifactUploadResponses, GetRbacEndpointData, GetRbacEndpointErrors, GetRbacEndpointResponses, GetRbacListResourceGroupsData, GetRbacListResourceGroupsErrors, GetRbacListResourceGroupsResponses, GetRbacListRolesData, GetRbacListRolesErrors, GetRbacListRolesResponses, GetRbacPolicyData, GetRbacPolicyErrors, GetRbacPolicyResponses, GetRbacResourceGroupData, GetRbacResourceGroupErrors, GetRbacResourceGroupResponses, GetRbacRoleData, GetRbacRoleErrors, GetRbacRoleResponses, GetRbacUserData, GetRbacUserErrors, GetRbacUserResponses, GetTasksListData, GetTasksListErrors, GetTasksListResponses, GetTasksTaskData, GetTasksTaskErrors, GetTasksTaskResponses, GetUsersListData, GetUsersListErrors, GetUsersListResponses, GetUsersMeData, GetUsersMeErrors, GetUsersMeResponses, GetUsersUserData, GetUsersUserErrors, GetUsersUserResponses, HeadArtifactData, HeadArtifactErrors, HeadArtifactResponses, HeadRbacResourceGroupData, HeadRbacResourceGroupErrors, HeadRbacResourceGroupResponses, HeadRbacRoleData, HeadRbacRoleErrors, HeadRbacRoleResponses, HeadUsersUserData, HeadUsersUserErrors, HeadUsersUserResponses, PatchUsersMeData, PatchUsersMeErrors, PatchUsersMeResponses, PatchUsersUserData, PatchUsersUserErrors, PatchUsersUserResponses, PostArtifactTagData, PostArtifactTagErrors, PostArtifactTagResponses, PostArtifactUploadData, PostArtifactUploadErrors, PostArtifactUploadResponses, PostManifestData, PostManifestErrors, PostManifestResponses, PostRbacEndpointData, PostRbacEndpointErrors, PostRbacEndpointResponses, PostRbacPolicyData, PostRbacPolicyErrors, PostRbacPolicyResponses, PostRbacResourceGroupData, PostRbacResourceGroupErrors, PostRbacResourceGroupResponses, PostRbacRoleData, PostRbacRoleErrors, PostRbacRoleResponses, PostRbacUserData, PostRbacUserErrors, PostRbacUserResponses, PostUsersUserData, PostUsersUserErrors, PostUsersUserResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -513,4 +513,26 @@ export const postManifest = <ThrowOnError extends boolean = false>(options: Opti
         'Content-Type': 'text/yaml',
         ...options.headers
     }
+});
+
+/**
+ * Get Task List
+ *
+ * Retrieve a list of all task states.
+ */
+export const getTasksList = <ThrowOnError extends boolean = false>(options?: Options<GetTasksListData, ThrowOnError>) => (options?.client ?? client).get<GetTasksListResponses, GetTasksListErrors, ThrowOnError>({
+    security: [{ scheme: 'basic', type: 'http' }],
+    url: '/tasks/list',
+    ...options
+});
+
+/**
+ * Get Single Task
+ *
+ * Retrieve information about a specific task by ID.
+ */
+export const getTasksTask = <ThrowOnError extends boolean = false>(options: Options<GetTasksTaskData, ThrowOnError>) => (options.client ?? client).get<GetTasksTaskResponses, GetTasksTaskErrors, ThrowOnError>({
+    security: [{ scheme: 'basic', type: 'http' }],
+    url: '/tasks/task',
+    ...options
 });
