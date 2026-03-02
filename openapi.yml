@@ -921,22 +921,16 @@ paths:
   /artifact:
     head:
       summary: Check Artifact Existence
-      description: Check if a specific artifact exists based on its fully qualified name (FQN).
+      description: Check if a specific artifact exists based on its package name.
       tags:
         - Artifacts
       parameters:
-        - name: source
+        - name: namespace
           in: query
           required: true
           schema:
             type: string
-          description: The source of the artifact.
-        - name: author
-          in: query
-          required: true
-          schema:
-            type: string
-          description: The author of the artifact.
+          description: The namespace of the artifact.
         - name: name
           in: query
           required: true
@@ -968,22 +962,16 @@ paths:
         - BasicAuth: []
     get:
       summary: Retrieve Artifact Metadata
-      description: Retrieve metadata for a specific artifact based on its fully qualified name (FQN).
+      description: Retrieve metadata for a specific artifact based on its package name.
       tags:
         - Artifacts
       parameters:
-        - name: source
+        - name: namespace
           in: query
           required: true
           schema:
             type: string
-          description: The source of the artifact.
-        - name: author
-          in: query
-          required: true
-          schema:
-            type: string
-          description: The author of the artifact.
+          description: The namespace of the artifact.
         - name: name
           in: query
           required: true
@@ -1019,7 +1007,7 @@ paths:
         - BasicAuth: []
     delete:
       summary: Delete Artifact
-      description: Delete a specific artifact based on its fully qualified name (FQN).
+      description: Delete a specific artifact based on its package name.
       tags:
         - Artifacts
       requestBody:
@@ -1029,11 +1017,11 @@ paths:
             schema:
               type: object
               required:
-                - fqn
+                - package
                 - identifier
               properties:
-                fqn:
-                  $ref: "#/components/schemas/FQN"
+                package:
+                  $ref: "#/components/schemas/PackageName"
                 identifier:
                   type: string
                   description: Either the version hash or tag of the artifact.
@@ -1071,12 +1059,12 @@ paths:
             schema:
               type: object
               required:
-                - fqn
+                - package
                 - versionHash
                 - newTag
               properties:
-                fqn:
-                  $ref: "#/components/schemas/FQN"
+                package:
+                  $ref: "#/components/schemas/PackageName"
                 versionHash:
                   type: string
                   description: The version hash of the artifact to tag.
@@ -1112,12 +1100,12 @@ paths:
             schema:
               type: object
               required:
-                - fqn
+                - package
                 - versionHash
                 - tag
               properties:
-                fqn:
-                  $ref: "#/components/schemas/FQN"
+                package:
+                  $ref: "#/components/schemas/PackageName"
                 versionHash:
                   type: string
                   description: The version hash of the artifact to untag.
@@ -1144,22 +1132,16 @@ paths:
   /artifact/upload:
     get:
       summary: Download Artifact
-      description: Download the artifact file based on its fully qualified name (FQN) and identifier.
+      description: Download the artifact file based on its package name and identifier.
       tags:
         - Artifacts
       parameters:
-        - name: source
+        - name: namespace
           in: query
           required: true
           schema:
             type: string
-          description: The source of the artifact.
-        - name: author
-          in: query
-          required: true
-          schema:
-            type: string
-          description: The author of the artifact.
+          description: The namespace of the artifact.
         - name: name
           in: query
           required: true
@@ -1206,17 +1188,13 @@ paths:
             schema:
               type: object
               required:
-                - source
-                - author
+                - namespace
                 - name
                 - file
               properties:
-                source:
+                namespace:
                   type: string
-                  description: The source of the artifact.
-                author:
-                  type: string
-                  description: The author of the artifact.
+                  description: The namespace of the artifact.
                 name:
                   type: string
                   description: The name of the artifact.
@@ -1261,24 +1239,18 @@ paths:
       tags:
         - Artifacts
       parameters:
-        - name: source
+        - name: namespace
           in: query
           required: false
           schema:
             type: string
-          description: The source of the artifact.
+          description: The namespace of the artifact.
         - name: name
           in: query
           required: false
           schema:
             type: string
           description: The name of the artifact.
-        - name: author
-          in: query
-          required: false
-          schema:
-            type: string
-          description: The author of the artifact.
       responses:
         "200":
           description: Successful response with a list of artifact metadata.
@@ -1312,9 +1284,11 @@ paths:
           text/yaml: {}
       responses:
         "201":
-          description: Manifest created successfully.
+          description: Manifest created successfully. Returns the resource id
           content:
-            text/yaml: {}
+            text/plain:
+              schema:
+                type: string
         "400":
           $ref: "#/components/responses/GenericBadRequest"
         "401":
@@ -1333,8 +1307,8 @@ paths:
         - BasicAuth: []
   /tasks/list:
     get:
-      summary: Get Task List
-      description: Retrieve a list of all task states.
+      summary: Get Task list
+      description: Retrieve a list of all tasks not including task logs.
       tags:
         - Tasks
       responses:
@@ -1359,7 +1333,7 @@ paths:
   /tasks/task:
     get:
       summary: Get Single Task
-      description: Retrieve information about a specific task by ID.
+      description: Retrieve information about a specific task by ID containing its logs.
       tags:
         - Tasks
       parameters:
@@ -1394,31 +1368,15 @@ components:
       type: object
       required:
         - id
-        - created_on
-        - last_action
-        - runner_host
         - retries
         - max_retries
+        - state
         - retention
-        - status
-        - result_payload
       properties:
         id:
           type: string
           description: The unique identifier for the task.
           example: "98aw7cfz"
-        created_on:
-          type: string
-          description: The timestamp when the task was created.
-          example: "2026-02-23-22:24"
-        last_action:
-          type: string
-          description: The last action performed on the task.
-          example: "SUBMITTED"
-        runner_host:
-          type: string
-          description: The host running the task.
-          example: ""
         retries:
           type: integer
           description: The current number of retries.
@@ -1427,18 +1385,55 @@ components:
           type: integer
           description: The maximum number of retries allowed.
           example: 3
-        retention:
+        state:
           type: string
-          description: The retention period for the task.
-          example: "1d2h"
-        status:
-          type: string
-          description: The current status of the task.
-          example: "ONGOING"
+          description: The current status of the task. See https://github.com/hibiken/asynq/wiki/Life-of-a-Task
+          example: "ACTIVE"
         result_payload:
           type: string
           description: The result payload of the task.
-          example: ""
+        last_error:
+          type: string
+          description: The error message from the last failure
+        last_failed_at:
+          type: string
+          description: Time of the last failure. RFC 3339 format.
+          example: "2023-09-24T15:30:00Z"
+        next_process_at:
+          type: string
+          description: Time the task will be scheduled to be processed. RFC 3339 format.
+          example: "2023-09-24T15:30:00Z"
+        retention:
+          type: string
+          description: Duration the task will be retained after succeeding. Golang duration string.
+          example: 5h3m2s
+        completed_at:
+          type: string
+          description: Time the task successfully finished processing.
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskLog"
+    TaskLog:
+      type: object
+      required:
+        - timestamp
+        - level
+        - issuer
+        - message
+      properties:
+        timestamp:
+          type: string
+          description: The time the log entry was created. RFC 3339 format.
+        level:
+          type: string
+          description: The log level (DEBUG, INFO, WARN, ERROR, FATAL).
+        issuer:
+          type: string
+          description: The component that issued the log entry (SYSTEM, ARTIFACT).
+        message:
+          type: string
+          description: The log message content.
     ErrGeneric:
       type: object
       required:
@@ -1566,20 +1561,16 @@ components:
             - HEAD
             - "*"
           description: The allowed permission (e.g., "GET", "POST", "*").
-    FQN:
+    PackageName:
       type: object
-      description: Fully qualified name of an artifact.
+      description: Package name of an artifact.
       required:
-        - source
-        - author
+        - namespace
         - name
       properties:
-        source:
+        namespace:
           type: string
-          description: The source of the artifact.
-        author:
-          type: string
-          description: The author of the artifact.
+          description: The namespace of the artifact.
         name:
           type: string
           description: The name of the artifact.
@@ -1587,14 +1578,14 @@ components:
       type: object
       description: Metadata of an artifact.
       required:
-        - fqn
+        - package
         - versionHash
         - createdAt
         - pulls
         - tags
       properties:
-        fqn:
-          $ref: "#/components/schemas/FQN"
+        package:
+          $ref: "#/components/schemas/PackageName"
         versionHash:
           type: string
           description: The version hash of the artifact.
