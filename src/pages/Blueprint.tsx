@@ -103,11 +103,11 @@ const blueprintJson = {
     apiVersion: "blueprint.enclave-runner.de/v1alpha1",
     kind: "Blueprint",
     metadata: {
-        name: artifact.fqn.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+        name: artifact.package.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
     },
     spec: {
         artifact: {
-            source: `${artifact.fqn.source}/${artifact.fqn.author}/${artifact.fqn.name}:${artifact.versionHash ? "hash:" + artifact.versionHash : (artifact.tags && artifact.tags.length > 0 ? artifact.tags[0] : "")}`,
+            source: `${artifact.package.namespace}/${artifact.package.name}:${artifact.versionHash ? "hash:" + artifact.versionHash : (artifact.tags && artifact.tags.length > 0 ? artifact.tags[0] : "")}`,
             function: "helloWorld",
             input: btoa(JSON.stringify("hello world")) // Example input encoded in base64
         }
@@ -123,12 +123,11 @@ const blueprintJson = {
   });
 
   // Generate blueprint text description
-  const blueprintText = `# Blueprint for ${artifact.fqn.name}
+  const blueprintText = `# Blueprint for ${artifact.package.name}
 
 ## Artifact Information
-**Name:** ${artifact.fqn.name}
-**Author:** ${artifact.fqn.author}
-**Source:** ${artifact.fqn.source}
+**Name:** ${artifact.package.name}
+**Namespace:** ${artifact.package.namespace}
 **Version Hash:** ${artifact.versionHash}
 **Created:** ${new Date(artifact.createdAt).toLocaleString()}
 **Tags:** ${artifact.tags && artifact.tags.length > 0 ? artifact.tags.join(', ') : 'No tags'}
@@ -285,7 +284,7 @@ ${blueprintJsonString}`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${artifact.fqn.name}-blueprint.yaml`;
+    a.download = `${artifact.package.name}-blueprint.yaml`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -303,9 +302,9 @@ ${blueprintJsonString}`;
               <IconArrowLeft className="h-4 w-4 mr-2" />
               Back to Artifacts
             </Button>
-            <h1 className="text-3xl font-bold mt-2">Blueprint: {artifact.fqn.name}</h1>
+            <h1 className="text-3xl font-bold mt-2">Blueprint: {artifact.package.name}</h1>
             <p className="text-muted-foreground">
-              Generated blueprint configuration from artifact <strong>{artifact.fqn.source}/{artifact.fqn.author}/{artifact.fqn.name}</strong>
+              Generated blueprint configuration from artifact <strong>{artifact.package.namespace}/{artifact.package.name}</strong>
             </p>
           </div>
         </div>

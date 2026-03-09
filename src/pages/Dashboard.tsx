@@ -75,15 +75,8 @@ export default function Dashboard() {
 
   // Calculate essential task metrics
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(task => 
-    task.status.toLowerCase().includes('completed') || 
-    task.status.toLowerCase().includes('success') ||
-    task.last_action === 'COMPLETED'
-  ).length;
-  const failedTasks = tasks.filter(task => 
-    task.status.toLowerCase().includes('failed') || 
-    task.status.toLowerCase().includes('error')
-  ).length;
+  const completedTasks = tasks.filter(task => task.state === 'completed').length;
+  const failedTasks = tasks.filter(task => task.state === 'archived').length;
 
   return (
     <PageLayout title="Dashboard">

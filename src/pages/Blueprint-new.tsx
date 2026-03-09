@@ -170,16 +170,16 @@ export default function Blueprint() {
     apiVersion: "enclave.dev/v1alpha1",
     kind: "Blueprint",
     metadata: {
-      name: artifact.fqn.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+      name: artifact.package.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
     },
     spec: {
       artifact: {
-        source: `${artifact.fqn.source}/${artifact.fqn.author}/${artifact.fqn.name}`,
+        source: `${artifact.package.namespace}/${artifact.package.name}`,
         function: "main",
         input: btoa(JSON.stringify({
           version: artifact.versionHash.substring(0, 8),
           tags: artifact.tags || [],
-          author: artifact.fqn.author,
+          namespace: artifact.package.namespace,
           created: artifact.createdAt
         }))
       }
@@ -189,7 +189,7 @@ export default function Blueprint() {
       created: new Date().toISOString(),
       events: [
         "Blueprint generated from artifact",
-        `Artifact ${artifact.fqn.name} imported`,
+        `Artifact ${artifact.package.name} imported`,
         `Version ${artifact.versionHash.substring(0, 8)} processed`
       ],
       revisions: 1
@@ -205,12 +205,11 @@ export default function Blueprint() {
   });
 
   // Generate blueprint text description
-  const blueprintText = `# Blueprint for ${artifact.fqn.name}
+  const blueprintText = `# Blueprint for ${artifact.package.name}
 
 ## Artifact Information
-**Name:** ${artifact.fqn.name}
-**Author:** ${artifact.fqn.author}
-**Source:** ${artifact.fqn.source}
+**Name:** ${artifact.package.name}
+**Namespace:** ${artifact.package.namespace}
 **Version Hash:** ${artifact.versionHash}
 **Created:** ${new Date(artifact.createdAt).toLocaleString()}
 **Tags:** ${artifact.tags && artifact.tags.length > 0 ? artifact.tags.join(', ') : 'No tags'}
@@ -330,14 +329,13 @@ ${blueprintJsonString}`;
 
       // Create manifest by uploading the blueprint YAML as an artifact
       const formData = new FormData();
-      formData.append('source', 'blueprint');
-      formData.append('author', 'system');
-      formData.append('name', `${artifact.fqn.name}-manifest`);
+      formData.append('namespace', 'blueprint');
+      formData.append('name', `${artifact.package.name}-manifest`);
       formData.append('tags', 'manifest,blueprint');
       
       // Create a blob from the YAML string and append as file
       const yamlBlob = new Blob([currentContent], { type: 'application/x-yaml' });
-      formData.append('file', yamlBlob, `${artifact.fqn.name}-manifest.yaml`);
+      formData.append('file', yamlBlob, `${artifact.package.name}-manifest.yaml`);
 
       // Call the upload artifact API to create the manifest
       const response = await fetch('/artifact/upload', {
@@ -350,7 +348,7 @@ ${blueprintJsonString}`;
 
       if (response.ok) {
         const result = await response.json();
-        toast.success(`Blueprint manifest created successfully! Artifact ID: ${result.id || result.fqn}`);
+        toast.success(`Blueprint manifest created successfully! Artifact ID: ${result.id || result.package}`);
       } else {
         const errorData = await response.json();
         toast.error(`Failed to create manifest: ${errorData.message || response.statusText}`);
@@ -367,7 +365,7 @@ ${blueprintJsonString}`;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${artifact.fqn.name}-blueprint.yaml`;
+    a.download = `${artifact.package.name}-blueprint.yaml`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -385,9 +383,9 @@ ${blueprintJsonString}`;
               <IconArrowLeft className="h-4 w-4 mr-2" />
               Back to Artifacts
             </Button>
-            <h1 className="text-3xl font-bold mt-2">Blueprint: {artifact.fqn.name}</h1>
+            <h1 className="text-3xl font-bold mt-2">Blueprint: {artifact.package.name}</h1>
             <p className="text-muted-foreground">
-              Generated blueprint configuration from artifact <strong>{artifact.fqn.source}/{artifact.fqn.author}/{artifact.fqn.name}</strong>
+              Generated blueprint configuration from artifact <strong>{artifact.package.namespace}/{artifact.package.name}</strong>
             </p>
           </div>
         </div>
