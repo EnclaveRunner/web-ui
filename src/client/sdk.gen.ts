@@ -397,7 +397,7 @@ export const postRbacPolicy = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Delete Artifact
  *
- * Delete a specific artifact based on its fully qualified name (FQN).
+ * Delete a specific artifact based on its package name.
  */
 export const deleteArtifact = <ThrowOnError extends boolean = false>(options: Options<DeleteArtifactData, ThrowOnError>) => (options.client ?? client).delete<DeleteArtifactResponses, DeleteArtifactErrors, ThrowOnError>({
     security: [{ scheme: 'basic', type: 'http' }],
@@ -412,7 +412,7 @@ export const deleteArtifact = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Retrieve Artifact Metadata
  *
- * Retrieve metadata for a specific artifact based on its fully qualified name (FQN).
+ * Retrieve metadata for a specific artifact based on its package name.
  */
 export const getArtifact = <ThrowOnError extends boolean = false>(options: Options<GetArtifactData, ThrowOnError>) => (options.client ?? client).get<GetArtifactResponses, GetArtifactErrors, ThrowOnError>({
     security: [{ scheme: 'basic', type: 'http' }],
@@ -423,7 +423,7 @@ export const getArtifact = <ThrowOnError extends boolean = false>(options: Optio
 /**
  * Check Artifact Existence
  *
- * Check if a specific artifact exists based on its fully qualified name (FQN).
+ * Check if a specific artifact exists based on its package name.
  */
 export const headArtifact = <ThrowOnError extends boolean = false>(options: Options<HeadArtifactData, ThrowOnError>) => (options.client ?? client).head<HeadArtifactResponses, HeadArtifactErrors, ThrowOnError>({
     security: [{ scheme: 'basic', type: 'http' }],
@@ -464,7 +464,7 @@ export const postArtifactTag = <ThrowOnError extends boolean = false>(options: O
 /**
  * Download Artifact
  *
- * Download the artifact file based on its fully qualified name (FQN) and identifier.
+ * Download the artifact file based on its package name and identifier.
  */
 export const getArtifactUpload = <ThrowOnError extends boolean = false>(options: Options<GetArtifactUploadData, ThrowOnError>) => (options.client ?? client).get<GetArtifactUploadResponses, GetArtifactUploadErrors, ThrowOnError>({
     security: [{ scheme: 'basic', type: 'http' }],
@@ -516,9 +516,9 @@ export const postManifest = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Get Task List
+ * Get Task list
  *
- * Retrieve a list of all task states.
+ * Retrieve a list of all tasks not including task logs.
  */
 export const getTasksList = <ThrowOnError extends boolean = false>(options?: Options<GetTasksListData, ThrowOnError>) => (options?.client ?? client).get<GetTasksListResponses, GetTasksListErrors, ThrowOnError>({
     security: [{ scheme: 'basic', type: 'http' }],
@@ -529,7 +529,7 @@ export const getTasksList = <ThrowOnError extends boolean = false>(options?: Opt
 /**
  * Get Single Task
  *
- * Retrieve information about a specific task by ID.
+ * Retrieve information about a specific task by ID containing its logs.
  */
 export const getTasksTask = <ThrowOnError extends boolean = false>(options: Options<GetTasksTaskData, ThrowOnError>) => (options.client ?? client).get<GetTasksTaskResponses, GetTasksTaskErrors, ThrowOnError>({
     security: [{ scheme: 'basic', type: 'http' }],

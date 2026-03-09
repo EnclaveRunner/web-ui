@@ -138,9 +138,8 @@ export default function Artifacts() {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      artifact.fqn.name.toLowerCase().includes(searchLower) ||
-      artifact.fqn.author.toLowerCase().includes(searchLower) ||
-      artifact.fqn.source.toLowerCase().includes(searchLower) ||
+      artifact.package.name.toLowerCase().includes(searchLower) ||
+      artifact.package.namespace.toLowerCase().includes(searchLower) ||
       artifact.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
       artifact.versionHash.toLowerCase().includes(searchLower)
     );
@@ -209,12 +208,12 @@ export default function Artifacts() {
 
       await deleteArtifact({
         body: {
-          fqn: artifactToDelete.fqn,
+          package: artifactToDelete.package,
           identifier: `hash:${artifactToDelete.versionHash}`
         }
       });
 
-      toast.success(`Artifact "${artifactToDelete.fqn.name}" deleted successfully!`);
+      toast.success(`Artifact "${artifactToDelete.package.name}" deleted successfully!`);
       
       // Close dialog and refresh the artifacts list
       setArtifactToDelete(null);
@@ -320,7 +319,7 @@ export default function Artifacts() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {paginatedArtifacts.map((artifact) => (
               <Card
-                key={`${artifact.fqn.source}-${artifact.fqn.author}-${artifact.fqn.name}-${artifact.versionHash}`}
+                key={`${artifact.package.namespace}-${artifact.package.name}-${artifact.versionHash}`}
                 className="group hover:shadow-lg transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -328,7 +327,7 @@ export default function Artifacts() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <IconPackage className="h-5 w-5 text-primary shrink-0" />
                       <CardTitle className="text-base truncate">
-                        {artifact.fqn.name}
+                        {artifact.package.name}
                       </CardTitle>
                     </div>
                     <div className="flex gap-2 shrink-0">
@@ -346,40 +345,24 @@ export default function Artifacts() {
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center justify-between">
                       <p className="truncate">
-                        <strong>Source:</strong> {artifact.fqn.source}
+                        <strong>Namespace:</strong> {artifact.package.namespace}
                       </p>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() =>
-                          copyToClipboard(artifact.fqn.source, "Source")
+                          copyToClipboard(artifact.package.namespace, "Namespace")
                         }
-                        title="Copy source"
-                      >
-                        <IconCopy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <p className="truncate">
-                        <strong>Author:</strong> {artifact.fqn.author}
-                      </p>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() =>
-                          copyToClipboard(artifact.fqn.author, "Author")
-                        }
-                        title="Copy author"
+                        title="Copy namespace"
                       >
                         <IconCopy className="h-3 w-3" />
                       </Button>
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="truncate max-w-[180px] sm:max-w-[260px] md:max-w-[320px] break-all">
-                        <strong>FQN:</strong>{" "}
-                        {`${artifact.fqn.source}/${artifact.fqn.author}/${artifact.fqn.name}`}
+                        <strong>Package:</strong>{" "}
+                        {`${artifact.package.namespace}/${artifact.package.name}`}
                       </p>
                       <Button
                         size="sm"
@@ -387,11 +370,11 @@ export default function Artifacts() {
                         className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() =>
                           copyToClipboard(
-                            `${artifact.fqn.source}/${artifact.fqn.author}/${artifact.fqn.name}`,
-                            "FQN"
+                            `${artifact.package.namespace}/${artifact.package.name}`,
+                            "Package"
                           )
                         }
-                        title="Copy fully qualified name"
+                        title="Copy package"
                       >
                         <IconCopy className="h-3 w-3" />
                       </Button>
@@ -407,7 +390,7 @@ export default function Artifacts() {
                     className="w-full"
                     onClick={() => {
                       // Navigate to blueprint page with artifact data
-                      const artifactId = `${artifact.fqn.source}-${artifact.fqn.author}-${artifact.fqn.name}-${artifact.versionHash}`;
+                      const artifactId = `${artifact.package.namespace}-${artifact.package.name}-${artifact.versionHash}`;
                       navigate(`/blueprint/${encodeURIComponent(artifactId)}`, {
                         state: { artifact },
                       });
@@ -655,7 +638,7 @@ export default function Artifacts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Artifact</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{artifactToDelete?.fqn.name}"?
+              Are you sure you want to delete "{artifactToDelete?.package.name}"?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

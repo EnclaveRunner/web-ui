@@ -9,46 +9,69 @@ import { client } from "../client/client.gen";
 import type { TaskState } from "../client/types.gen";
 import {
   IconActivity,
+  IconAlertCircle,
+  IconCircleCheck,
   IconClock,
   IconCpu,
   IconDatabase,
   IconLockAccess,
   IconPlayerPlay,
   IconRefresh,
-  IconServer,
+  IconRotate,
 } from "@tabler/icons-react";
 
 const TASK_STAGES: { [key: string]: { name: string; color: string; icon: React.ReactNode; iconColor: string } } = {
-  ENQUEUED: {
-    name: 'Enqueued',
+  scheduled: {
+    name: 'Scheduled',
     color: 'border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/30',
     iconColor: 'text-blue-500',
     icon: <IconClock className="h-4 w-4 text-blue-500" />
   },
-  PICKED_UP: {
-    name: 'Picked Up', 
+  pending: {
+    name: 'Pending',
     color: 'border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/30',
     iconColor: 'text-amber-500',
     icon: <IconCpu className="h-4 w-4 text-amber-500" />
   },
-  RUNNING: {
-    name: 'Running',
+  active: {
+    name: 'Active',
     color: 'border-l-4 border-l-green-500 bg-green-50 dark:bg-green-950/30',
     iconColor: 'text-green-500',
     icon: <IconPlayerPlay className="h-4 w-4 text-green-500 animate-pulse" />
-  }
+  },
+  completed: {
+    name: 'Completed',
+    color: 'border-l-4 border-l-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
+    iconColor: 'text-emerald-500',
+    icon: <IconCircleCheck className="h-4 w-4 text-emerald-500" />
+  },
+  retry: {
+    name: 'Retry',
+    color: 'border-l-4 border-l-orange-500 bg-orange-50 dark:bg-orange-950/30',
+    iconColor: 'text-orange-500',
+    icon: <IconRotate className="h-4 w-4 text-orange-500" />
+  },
+  archived: {
+    name: 'Archived',
+    color: 'border-l-4 border-l-red-500 bg-red-50 dark:bg-red-950/30',
+    iconColor: 'text-red-500',
+    icon: <IconAlertCircle className="h-4 w-4 text-red-500" />
+  },
 };
 
-function getTaskStatusBadge(lastAction: string) {
+function getTaskStatusBadge(state: string) {
   const statusColors: { [key: string]: string } = {
-    ENQUEUED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    PICKED_UP: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
-    RUNNING: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    scheduled: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+    pending:   'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300',
+    active:    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+    completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+    retry:     'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+    archived:  'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
   };
-  
-  const stage = TASK_STAGES[lastAction] || TASK_STAGES.ENQUEUED;
-  const colorClass = statusColors[lastAction] || statusColors.ENQUEUED;
-  
+
+  const stage = TASK_STAGES[state] || TASK_STAGES.pending;
+  const colorClass = statusColors[state] || statusColors.pending;
+
   return (
     <Badge className={`${colorClass} flex items-center gap-1`}>
       {stage.icon}
@@ -58,29 +81,38 @@ function getTaskStatusBadge(lastAction: string) {
 }
 
 function TaskCard({ task }: { task: TaskState }) {
-  const formatTime = (timestamp: string) => {
+  const formatTime = (timestamp?: string) => {
+    if (!timestamp) return '—';
     try {
-      // Handle the custom format "2026-02-23-14:45" by replacing the last hyphen with space and adding seconds
-      const normalizedTimestamp = timestamp.replace(/-([0-9]{2}:[0-9]{2})$/, ' $1:00');
-      const date = new Date(normalizedTimestamp);
-      
-      if (isNaN(date.getTime())) {
-        return timestamp; // Return original if parsing fails
-      }
-      
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return timestamp;
       return date.toLocaleString('en-US', {
         month: 'short',
-        day: 'numeric', 
+        day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-        hour12: false
+        hour12: false,
       });
     } catch {
       return timestamp;
     }
   };
 
-  const stage = TASK_STAGES[task.last_action] || TASK_STAGES.ENQUEUED;
+  const stage = TASK_STAGES[task.state] || TASK_STAGES.pending;
+
+  const stateTimestamp: string | undefined =
+    task.state === 'scheduled' ? task.next_process_at :
+    task.state === 'completed' ? task.completed_at :
+    task.state === 'retry'     ? task.last_failed_at :
+    task.state === 'archived'  ? task.last_failed_at :
+    undefined;
+
+  const timestampLabel =
+    task.state === 'scheduled' ? 'Run at' :
+    task.state === 'completed' ? 'Completed' :
+    task.state === 'retry'     ? 'Last failed' :
+    task.state === 'archived'  ? 'Failed at' :
+    'Time';
 
   return (
     <Card className={`mb-3 ${stage.color} hover:shadow-md transition-shadow`}>
@@ -89,17 +121,9 @@ function TaskCard({ task }: { task: TaskState }) {
           <div className="font-mono text-sm font-medium truncate">
             {task.id.split('-')[0]}
           </div>
-          {getTaskStatusBadge(task.last_action)}
+          {getTaskStatusBadge(task.state)}
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <IconServer className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-            <span className="truncate font-medium">{task.runner_host || 'Unassigned'}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <IconClock className="h-4 w-4 text-blue-500" />
-            <span className="font-medium">{formatTime(task.created_on)}</span>
-          </div>
           <div className="flex items-center gap-2">
             <IconActivity className="h-4 w-4 text-purple-500" />
             <span className="font-medium">Retries: {task.retries}/{task.max_retries}</span>
@@ -108,13 +132,24 @@ function TaskCard({ task }: { task: TaskState }) {
             <IconDatabase className="h-4 w-4 text-orange-500" />
             <span className="font-medium">{task.retention}</span>
           </div>
+          {stateTimestamp && (
+            <div className="col-span-2 flex items-center gap-2">
+              <IconClock className="h-4 w-4 text-blue-500 shrink-0" />
+              <span className="text-muted-foreground text-xs">{timestampLabel}:</span>
+              <span className="font-medium text-xs">{formatTime(stateTimestamp)}</span>
+            </div>
+          )}
         </div>
-        <div className="mt-3 pt-2 border-t">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">Status:</span>
-            <span className="text-xs font-medium">{task.status}</span>
+        {(task.state === 'retry' || task.state === 'archived') && task.last_error && (
+          <div className="mt-3 pt-2 border-t">
+            <div className="flex items-start gap-2">
+              <IconAlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
+              <span className="text-xs text-red-600 dark:text-red-400 break-words line-clamp-2">
+                {task.last_error}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -274,17 +309,17 @@ export default function TaskOverview() {
     fetchTasks();
   };
 
-  // Group tasks by last_action
-  const tasksByAction = tasks.reduce((acc, task) => {
-    const action = task.last_action || 'ENQUEUED';
-    if (!acc[action]) acc[action] = [];
-    acc[action].push(task);
+  // Group tasks by state
+  const tasksByState = tasks.reduce((acc, task) => {
+    const state = task.state || 'pending';
+    if (!acc[state]) acc[state] = [];
+    acc[state].push(task);
     return acc;
   }, {} as Record<string, TaskState[]>);
 
   const totalTasks = tasks.length;
-  const enqueuedTasks = tasksByAction.ENQUEUED?.length || 0;
-  const runningTasks = tasksByAction.RUNNING?.length || 0;
+  const pendingTasks = (tasksByState.scheduled?.length || 0) + (tasksByState.pending?.length || 0);
+  const activeTasks = tasksByState.active?.length || 0;
 
   // ===== ACCESS DENIED STATE =====
   console.log('Access check - hasAccess:', hasAccess, 'loading:', loading);
@@ -349,20 +384,20 @@ export default function TaskOverview() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Enqueued</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
             <IconClock className="h-5 w-5 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{enqueuedTasks}</div>
+            <div className="text-2xl font-bold">{pendingTasks}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Running</CardTitle>
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
             <IconPlayerPlay className="h-5 w-5 text-purple-500 animate-pulse" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{runningTasks}</div>
+            <div className="text-2xl font-bold">{activeTasks}</div>
           </CardContent>
         </Card>
       </div>
@@ -374,12 +409,12 @@ export default function TaskOverview() {
           <h2 className="text-xl font-semibold">Task Pipeline</h2>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {Object.entries(TASK_STAGES).map(([actionKey, stage]) => (
-            <TaskStageColumn 
-              key={actionKey}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Object.entries(TASK_STAGES).map(([stateKey, stage]) => (
+            <TaskStageColumn
+              key={stateKey}
               stage={stage}
-              tasks={tasksByAction[actionKey] || []}
+              tasks={tasksByState[stateKey] || []}
               isLoading={loading}
             />
           ))}

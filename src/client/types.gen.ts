@@ -10,18 +10,6 @@ export type TaskState = {
      */
     id: string;
     /**
-     * The timestamp when the task was created.
-     */
-    created_on: string;
-    /**
-     * The last action performed on the task.
-     */
-    last_action: string;
-    /**
-     * The host running the task.
-     */
-    runner_host: string;
-    /**
      * The current number of retries.
      */
     retries: number;
@@ -30,17 +18,53 @@ export type TaskState = {
      */
     max_retries: number;
     /**
-     * The retention period for the task.
+     * The current status of the task. See https://github.com/hibiken/asynq/wiki/Life-of-a-Task
      */
-    retention: string;
-    /**
-     * The current status of the task.
-     */
-    status: string;
+    state: string;
     /**
      * The result payload of the task.
      */
-    result_payload: string;
+    result_payload?: string;
+    /**
+     * The error message from the last failure
+     */
+    last_error?: string;
+    /**
+     * Time of the last failure. RFC 3339 format.
+     */
+    last_failed_at?: string;
+    /**
+     * Time the task will be scheduled to be processed. RFC 3339 format.
+     */
+    next_process_at?: string;
+    /**
+     * Duration the task will be retained after succeeding. Golang duration string.
+     */
+    retention: string;
+    /**
+     * Time the task successfully finished processing.
+     */
+    completed_at?: string;
+    logs?: Array<TaskLog>;
+};
+
+export type TaskLog = {
+    /**
+     * The time the log entry was created. RFC 3339 format.
+     */
+    timestamp: string;
+    /**
+     * The log level (DEBUG, INFO, WARN, ERROR, FATAL).
+     */
+    level: string;
+    /**
+     * The component that issued the log entry (SYSTEM, ARTIFACT).
+     */
+    issuer: string;
+    /**
+     * The log message content.
+     */
+    message: string;
 };
 
 export type ErrGeneric = {
@@ -159,17 +183,13 @@ export type RbacPolicy = {
 };
 
 /**
- * Fully qualified name of an artifact.
+ * Package name of an artifact.
  */
-export type Fqn = {
+export type PackageName = {
     /**
-     * The source of the artifact.
+     * The namespace of the artifact.
      */
-    source: string;
-    /**
-     * The author of the artifact.
-     */
-    author: string;
+    namespace: string;
     /**
      * The name of the artifact.
      */
@@ -180,7 +200,7 @@ export type Fqn = {
  * Metadata of an artifact.
  */
 export type Artifact = {
-    fqn: Fqn;
+    package: PackageName;
     /**
      * The version hash of the artifact.
      */
@@ -1469,7 +1489,7 @@ export type PostRbacPolicyResponses = {
 
 export type DeleteArtifactData = {
     body: {
-        fqn: Fqn;
+        package: PackageName;
         /**
          * Either the version hash or tag of the artifact.
          */
@@ -1523,13 +1543,9 @@ export type GetArtifactData = {
     path?: never;
     query: {
         /**
-         * The source of the artifact.
+         * The namespace of the artifact.
          */
-        source: string;
-        /**
-         * The author of the artifact.
-         */
-        author: string;
+        namespace: string;
         /**
          * The name of the artifact.
          */
@@ -1585,13 +1601,9 @@ export type HeadArtifactData = {
     path?: never;
     query: {
         /**
-         * The source of the artifact.
+         * The namespace of the artifact.
          */
-        source: string;
-        /**
-         * The author of the artifact.
-         */
-        author: string;
+        namespace: string;
         /**
          * The name of the artifact.
          */
@@ -1642,7 +1654,7 @@ export type HeadArtifactResponses = {
 
 export type DeleteArtifactTagData = {
     body: {
-        fqn: Fqn;
+        package: PackageName;
         /**
          * The version hash of the artifact to untag.
          */
@@ -1695,7 +1707,7 @@ export type DeleteArtifactTagResponses = {
 
 export type PostArtifactTagData = {
     body: {
-        fqn: Fqn;
+        package: PackageName;
         /**
          * The version hash of the artifact to tag.
          */
@@ -1751,13 +1763,9 @@ export type GetArtifactUploadData = {
     path?: never;
     query: {
         /**
-         * The source of the artifact.
+         * The namespace of the artifact.
          */
-        source: string;
-        /**
-         * The author of the artifact.
-         */
-        author: string;
+        namespace: string;
         /**
          * The name of the artifact.
          */
@@ -1811,13 +1819,9 @@ export type GetArtifactUploadResponse = GetArtifactUploadResponses[keyof GetArti
 export type PostArtifactUploadData = {
     body: {
         /**
-         * The source of the artifact.
+         * The namespace of the artifact.
          */
-        source: string;
-        /**
-         * The author of the artifact.
-         */
-        author: string;
+        namespace: string;
         /**
          * The name of the artifact.
          */
@@ -1879,17 +1883,13 @@ export type GetArtifactListData = {
     path?: never;
     query?: {
         /**
-         * The source of the artifact.
+         * The namespace of the artifact.
          */
-        source?: string;
+        namespace?: string;
         /**
          * The name of the artifact.
          */
         name?: string;
-        /**
-         * The author of the artifact.
-         */
-        author?: string;
     };
     url: '/artifact/list';
 };
@@ -1962,9 +1962,9 @@ export type PostManifestError = PostManifestErrors[keyof PostManifestErrors];
 
 export type PostManifestResponses = {
     /**
-     * Manifest created successfully.
+     * Manifest created successfully. Returns the resource id
      */
-    201: Blob | File;
+    201: string;
 };
 
 export type PostManifestResponse = PostManifestResponses[keyof PostManifestResponses];
