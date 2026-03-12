@@ -106,11 +106,8 @@ const blueprintJson = {
         name: artifact.package.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
     },
     spec: {
-        artifact: {
-            source: `${artifact.package.namespace}/${artifact.package.name}:${artifact.versionHash ? "hash:" + artifact.versionHash : (artifact.tags && artifact.tags.length > 0 ? artifact.tags[0] : "")}`,
-            function: "helloWorld",
-            input: btoa(JSON.stringify("hello world")) // Example input encoded in base64
-        }
+        source: `${artifact.package.namespace}:${artifact.package.name}@hash:${artifact.versionHash}`,
+        function: "main",
     }
 };
 

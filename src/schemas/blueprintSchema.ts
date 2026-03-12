@@ -1,26 +1,30 @@
-/**
- * JSON Schema for Blueprint YAML validation
- * 
- * This schema defines the structure and validation rules for Blueprint YAML files
- * used in the Enclave system. It validates the following structure:
- * - apiVersion: enclave.dev/v1alpha1
- * - kind: Blueprint
- * - metadata: { name }
- * - spec: { artifact: { source, function, input } }
- * - status: { healthy, created, events, revisions } (optional)
- */
-
 export const blueprintSchema = {
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "apiVersion": {
-      "type": "string"
+  "$ref": "#/definitions/Blueprint",
+  "definitions": {
+    "Blueprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "apiVersion": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/Spec"
+        },
+        "status": {
+          "$ref": "#/definitions/Status"
+        }
+      },
+      "required": ["apiVersion", "kind", "metadata", "spec", "status"],
+      "title": "Blueprint"
     },
-    "kind": {
-      "type": "string"
-    },
-    "metadata": {
+    "Metadata": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -28,32 +32,46 @@ export const blueprintSchema = {
           "type": "string"
         }
       },
-      "required": ["name"]
+      "required": ["name"],
+      "title": "Metadata"
     },
-    "spec": {
+    "Spec": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "artifact": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "source": {
-              "type": "string"
-            },
-            "function": {
-              "type": "string"
-            },
-            "input": {
-              "type": "string"
-            }
-          },
-          "required": ["source", "function", "input"]
+        "source": {
+          "type": "string",
+          "description": "The identifier of the function to execute. Format: <namespace>:<name>/<interface>/<function>@<<version>|hash:<versionHash>>"
+        },
+        "params": {
+          "type": "array"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EnvVariable"
+          }
+        },
+        "retention": {
+          "type": "string",
+          "description": "Task retention duration as a Go time duration string (time.ParseDuration), e.g. \"48h\", \"72h\", or \"3h12m\"",
+          "examples": ["48h", "72h", "3h12m", "30m"]
+        },
+        "retries": {
+          "type": "integer",
+          "description": "Maximum retries on task failure"
         }
       },
-      "required": ["artifact"]
+      "required": ["source"],
+      "title": "Spec"
     },
-    "status": {
+    "Status": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -72,10 +90,22 @@ export const blueprintSchema = {
         "revisions": {
           "type": "integer"
         }
+      },
+      "required": ["created", "events", "healthy", "revisions"],
+      "title": "Status"
+    },
+    "EnvVariable": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
       }
     }
-  },
-  "required": ["apiVersion", "kind", "metadata", "spec"]
+  }
 } as const;
 
 export default blueprintSchema;

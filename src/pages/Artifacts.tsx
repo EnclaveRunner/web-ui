@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -18,6 +18,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,10 +50,12 @@ import {
   IconTrash,
   IconRefresh,
   IconCube,
+  IconUpload,
+  IconFile,
 } from "@tabler/icons-react";
 
 // API Client
-import { getArtifactList, deleteArtifact } from "../client";
+import { getArtifactList, deleteArtifact, postArtifactUpload } from "../client";
 import { client } from "../client/client.gen";
 import type { Artifact } from "../client";
 
@@ -59,7 +70,14 @@ export default function Artifacts() {
   const [hasAccess, setHasAccess] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [artifactToDelete, setArtifactToDelete] = useState<Artifact | null>(null);
-  
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadNamespace, setUploadNamespace] = useState("");
+  const [uploadName, setUploadName] = useState("");
+  const [uploadTag, setUploadTag] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // ===== PAGINATION CONSTANTS =====
   const ITEMS_PER_PAGE = 6;
 
@@ -234,6 +252,64 @@ export default function Artifacts() {
     }
   };
 
+  const handleUploadArtifact = async () => {
+    if (!uploadFile || !uploadNamespace.trim() || !uploadName.trim()) {
+      toast.error("Please fill in all required fields and select a file.");
+      return;
+    }
+
+    try {
+      setUploading(true);
+      configureClient();
+
+      const tags = uploadTag.trim()
+        ? uploadTag.split(",").map((t) => t.trim()).filter(Boolean)
+        : undefined;
+
+      await postArtifactUpload({
+        body: {
+          namespace: uploadNamespace.trim(),
+          name: uploadName.trim(),
+          ...(tags ? { tag: tags } : {}),
+          file: uploadFile,
+        },
+      });
+
+      toast.success(`Artifact "${uploadName}" uploaded successfully!`);
+      setUploadModalOpen(false);
+      setUploadNamespace("");
+      setUploadName("");
+      setUploadTag("");
+      setUploadFile(null);
+      await loadArtifacts();
+    } catch (error) {
+      console.error("Upload artifact error:", error);
+      const err = error as { status?: number; body?: { error?: string }; message?: string };
+
+      if (err.status === 409) {
+        toast.error("An artifact with this name already exists.");
+      } else if (err.status === 403 || err.status === 401) {
+        toast.error("You don't have permission to upload artifacts.");
+      } else if (err.status === 413) {
+        toast.error("The file is too large to upload.");
+      } else {
+        const message = err.body?.error || err.message || "Unknown error";
+        toast.error(`Failed to upload artifact: ${message}`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleCloseUploadModal = () => {
+    if (uploading) return;
+    setUploadModalOpen(false);
+    setUploadNamespace("");
+    setUploadName("");
+    setUploadTag("");
+    setUploadFile(null);
+  };
+
 
 
   // ===== RENDER =====
@@ -294,6 +370,10 @@ export default function Artifacts() {
                   className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
                 />
                 Refresh
+              </Button>
+              <Button onClick={() => setUploadModalOpen(true)}>
+                <IconUpload className="h-4 w-4 mr-2" />
+                Upload
               </Button>
             </div>
           </CardContent>
@@ -628,6 +708,135 @@ export default function Artifacts() {
           </div>
         )}
       </div>
+
+      {/* Upload Artifact Dialog */}
+      <Dialog open={uploadModalOpen} onOpenChange={(open) => !open && handleCloseUploadModal()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <IconUpload className="h-5 w-5" />
+              Upload Artifact
+            </DialogTitle>
+            <DialogDescription>
+              Upload a new artifact file with its metadata.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Namespace */}
+            <div className="space-y-1.5">
+              <Label htmlFor="upload-namespace">
+                Namespace <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="upload-namespace"
+                placeholder="e.g. myorg"
+                value={uploadNamespace}
+                onChange={(e) => setUploadNamespace(e.target.value)}
+                disabled={uploading}
+              />
+            </div>
+
+            {/* Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="upload-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="upload-name"
+                placeholder="e.g. my-artifact"
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+                disabled={uploading}
+              />
+            </div>
+
+            {/* Tag */}
+            <div className="space-y-1.5">
+              <Label htmlFor="upload-tag">Tag</Label>
+              <Input
+                id="upload-tag"
+                placeholder="e.g. latest, v1.0 (comma-separated)"
+                value={uploadTag}
+                onChange={(e) => setUploadTag(e.target.value)}
+                disabled={uploading}
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional. Separate multiple tags with commas.
+              </p>
+            </div>
+
+            {/* File */}
+            <div className="space-y-1.5">
+              <Label htmlFor="upload-file">
+                File <span className="text-destructive">*</span>
+              </Label>
+              <input
+                ref={fileInputRef}
+                id="upload-file"
+                type="file"
+                accept=".wasm"
+                className="hidden"
+                disabled={uploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  if (file && !file.name.endsWith(".wasm")) {
+                    toast.error("Only .wasm files are allowed.");
+                    e.target.value = "";
+                    return;
+                  }
+                  setUploadFile(file);
+                }}
+              />
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                type="button"
+              >
+                {uploadFile ? (
+                  <>
+                    <IconFile className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{uploadFile.name}</span>
+                    <Badge variant="secondary" className="ml-auto shrink-0 text-xs">
+                      {(uploadFile.size / 1024).toFixed(1)} KB
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    <IconUpload className="h-4 w-4 shrink-0" />
+                    <span className="text-muted-foreground">Choose .wasm file…</span>
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground">Only <code>.wasm</code> files are accepted.</p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={handleCloseUploadModal} disabled={uploading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUploadArtifact}
+              disabled={uploading || !uploadFile || !uploadNamespace.trim() || !uploadName.trim()}
+            >
+              {uploading ? (
+                <>
+                  <IconRefresh className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading…
+                </>
+              ) : (
+                <>
+                  <IconUpload className="h-4 w-4 mr-2" />
+                  Upload
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

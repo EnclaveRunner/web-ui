@@ -20,6 +20,16 @@ export function SiteHeader(props: SiteHeaderProps) {
           <ThemeToggle />
           <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
             <a
+              href="https://enclave-runner.de"
+              rel="noopener noreferrer"
+              target="_blank"
+              className="dark:text-foreground"
+            >
+              Docs
+            </a>
+          </Button>
+          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
+            <a
               href="https://github.com/EnclaveRunner"
               rel="noopener noreferrer"
               target="_blank"

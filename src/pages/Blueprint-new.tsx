@@ -22,100 +22,7 @@ import * as yaml from "js-yaml";
 import Ajv from "ajv";
 import addFormats from "ajv-formats";
 import type { Artifact } from "../client";
-
-// JSON Schema for Blueprint YAML validation
-const blueprintSchema = {
-  "$schema": "http://json-schema.org/draft-06/schema#",
-  "$ref": "#/definitions/Blueprint",
-  "definitions": {
-    "Blueprint": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "apiVersion": {
-          "type": "string"
-        },
-        "kind": {
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/definitions/Metadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/Spec"
-        },
-        "status": {
-          "$ref": "#/definitions/Status"
-        }
-      },
-      "required": ["apiVersion", "kind", "metadata", "spec", "status"],
-      "title": "Blueprint"
-    },
-    "Metadata": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      },
-      "required": ["name"],
-      "title": "Metadata"
-    },
-    "Spec": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "artifact": {
-          "$ref": "#/definitions/Artifact"
-        }
-      },
-      "required": ["artifact"],
-      "title": "Spec"
-    },
-    "Artifact": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "source": {
-          "type": "string"
-        },
-        "function": {
-          "type": "string"
-        },
-        "input": {
-          "type": "string",
-          "contentEncoding": "base64"
-        }
-      },
-      "required": ["source", "function", "input"],
-      "title": "Artifact"
-    },
-    "Status": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "healthy": {
-          "type": "boolean"
-        },
-        "created": {
-          "type": "string"
-        },
-        "events": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "revisions": {
-          "type": "integer"
-        }
-      },
-      "required": [],
-      "title": "Status"
-    }
-  }
-};
+import { blueprintSchema } from "../schemas/blueprintSchema";
 
 // Create AJV validator instance
 const createValidator = () => {
@@ -167,32 +74,13 @@ export default function Blueprint() {
 
   // Generate the blueprint YAML content as JSON
   const blueprintJson = {
-    apiVersion: "enclave.dev/v1alpha1",
+    apiVersion: "blueprint.enclave-runner.de/v1alpha1",
     kind: "Blueprint",
     metadata: {
       name: artifact.package.name.toLowerCase().replace(/[^a-z0-9-]/g, '-')
     },
     spec: {
-      artifact: {
-        source: `${artifact.package.namespace}/${artifact.package.name}`,
-        function: "main",
-        input: btoa(JSON.stringify({
-          version: artifact.versionHash.substring(0, 8),
-          tags: artifact.tags || [],
-          namespace: artifact.package.namespace,
-          created: artifact.createdAt
-        }))
-      }
-    },
-    status: {
-      healthy: true,
-      created: new Date().toISOString(),
-      events: [
-        "Blueprint generated from artifact",
-        `Artifact ${artifact.package.name} imported`,
-        `Version ${artifact.versionHash.substring(0, 8)} processed`
-      ],
-      revisions: 1
+      source: `${artifact.package.namespace}:${artifact.package.name}/<INTERFACE>/<FUNCTION>@:hash:${artifact.versionHash}`,
     }
   };
 
