@@ -668,7 +668,6 @@ export default function RoleManagement() {
       </PageLayout>
     );
   }
-
   return (
     <PageLayout title="Role & Group Management">
       <div className="space-y-6">
