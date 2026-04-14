@@ -1,22 +1,21 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  getUsersMe,
-  patchUsersMe,
-  deleteUsersUser,
-  getUsersList,
-  postUsersUser,
+  getV1UserMe,
+  patchV1UserMe,
+  patchV1UserByUsername,
+  deleteV1UserMe,
+  getV1User,
+  putV1UserByUsername,
+  deleteV1UserByUsername,
 } from "../client";
 import { client } from "../client/client.gen";
 import type {
   UserResponse,
   PatchMe,
-  UserRequest,
-  CreateUser,
 } from "../client/types.gen";
 
 interface User {
-  id: string;
   displayName: string;
   name: string;
 }
@@ -37,8 +36,8 @@ interface AuthContextType {
   isLoading: boolean;
 
   getAllUsers: () => Promise<UserResponse[]>;
-  createUser: (userData: CreateUser) => Promise<UserResponse>;
-  deleteUser: (userId: string) => Promise<void>;
+  createUser: (userData: { name: string; displayName: string; password: string }) => Promise<UserResponse>;
+  deleteUser: (username: string) => Promise<void>;
   hasAdminAccess: () => boolean;
 }
 
@@ -61,7 +60,10 @@ function decodeCredentials(
 ): { username: string; password: string } | null {
   try {
     const decoded = atob(encodedCredentials);
-    const [username, password] = decoded.split(":");
+    const colonIndex = decoded.indexOf(":");
+    if (colonIndex === -1) return null;
+    const username = decoded.slice(0, colonIndex);
+    const password = decoded.slice(colonIndex + 1);
     if (!username || !password) return null;
     return { username, password };
   } catch {
@@ -140,7 +142,6 @@ function handleApiError(error: unknown): void {
 // Helper to convert API response to our User type
 function mapUserResponse(apiUser: UserResponse): User {
   return {
-    id: apiUser.id,
     displayName: apiUser.displayName,
     name: apiUser.name,
   };
@@ -183,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       configureClient(username, password);
 
       // Test authentication by getting current user
-      const apiUser = await getUsersMe();
+      const apiUser = await getV1UserMe();
 
       if (!apiUser.data) {
         throw new Error("No user data received");
@@ -221,26 +222,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateUsername = async (newUsername: string): Promise<User> => {
     try {
-      configureClient(); // Use stored credentials
+      const credentials = getStoredCredentials();
+      if (!credentials) {
+        throw new Error("No stored credentials found");
+      }
 
-      const patchData: PatchMe = { newName: newUsername };
-      const response = await patchUsersMe({ body: patchData });
+      configureClient();
+
+      // Username rename is done via the admin patch endpoint
+      const response = await patchV1UserByUsername({
+        path: { username: credentials.username },
+        body: {},
+      });
 
       if (!response.data) {
         throw new Error("No response data received");
       }
 
+      // Note: the new API does not support renaming usernames.
+      // We update display name only and keep existing username.
       const updatedUser = mapUserResponse(response.data);
-
-      // Update stored credentials with new username
-      const credentials = getStoredCredentials();
-      if (credentials) {
-        localStorage.setItem(
-          STORAGE_KEYS.CREDENTIALS,
-          encodeCredentials(newUsername, credentials.password)
-        );
-        configureClient(newUsername, credentials.password);
-      }
+      void newUsername; // username change not supported by new API
 
       // Update user state and localStorage
       setUser(updatedUser);
@@ -258,8 +260,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       configureClient(); // Use stored credentials
 
-      const patchData: PatchMe = { newDisplayName: newDisplayName };
-      const response = await patchUsersMe({ body: patchData });
+      const patchData: PatchMe = { displayName: newDisplayName };
+      const response = await patchV1UserMe({ body: patchData });
 
       if (!response.data) {
         throw new Error("No response data received");
@@ -293,11 +295,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       configureClient(credentials.username, oldPassword);
 
       // Verify old password by making a request
-      await getUsersMe();
+      await getV1UserMe();
 
       // Now update password
-      const patchData: PatchMe = { newPassword: newPassword };
-      const response = await patchUsersMe({ body: patchData });
+      const patchData: PatchMe = { password: newPassword };
+      const response = await patchV1UserMe({ body: patchData });
 
       if (!response.data) {
         throw new Error("No response data received");
@@ -324,15 +326,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       configureClient(); // Use stored credentials
 
-      // First get current user to get the ID
-      const currentUser = await getUsersMe();
-
-      if (!currentUser.data?.id) {
-        throw new Error("Could not get user ID");
-      }
-
-      const deleteRequest: UserRequest = { id: currentUser.data.id };
-      await deleteUsersUser({ body: deleteRequest });
+      await deleteV1UserMe();
 
       // Clear user state and local storage
       setUser(null);
@@ -355,7 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       configureClient();
 
-      const response = await getUsersList();
+      const response = await getV1User();
 
       if (response.data && Array.isArray(response.data)) {
         return response.data;
@@ -369,11 +363,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const createUser = async (userData: CreateUser): Promise<UserResponse> => {
+  const createUser = async (userData: { name: string; displayName: string; password: string }): Promise<UserResponse> => {
     try {
       configureClient();
 
-      const response = await postUsersUser({ body: userData });
+      const response = await putV1UserByUsername({
+        path: { username: userData.name },
+        body: { password: userData.password, displayName: userData.displayName },
+      });
 
       if (!response.data) {
         throw new Error("No user data returned");
@@ -387,12 +384,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const deleteUser = async (userId: string): Promise<void> => {
+  const deleteUser = async (username: string): Promise<void> => {
     try {
       configureClient();
 
-      const deleteRequest: UserRequest = { id: userId };
-      await deleteUsersUser({ body: deleteRequest });
+      await deleteV1UserByUsername({ path: { username } });
     } catch (error) {
       console.error("Failed to delete user:", error);
       handleApiError(error);

@@ -4,67 +4,132 @@ export type ClientOptions = {
     baseUrl: `${string}://openapi.yml` | (string & {});
 };
 
-export type TaskState = {
+export type CreateTaskRequest = {
     /**
-     * The unique identifier for the task.
+     * Task source in the form namespace:name/interface/function@<hash|tag>.
+     */
+    source: string;
+    /**
+     * Parameters passed to the task.
+     */
+    params?: Array<unknown>;
+    /**
+     * Argument list used to invoke the task.
+     */
+    args?: Array<string>;
+    /**
+     * Environment variables supplied to the task.
+     */
+    env?: Array<EnvironmentVariable>;
+    /**
+     * Callback URL invoked on task completion.
+     */
+    callback?: string;
+    /**
+     * Duration to retain the task after completion.
+     */
+    retention?: string;
+    /**
+     * Maximum number of retries before the task is moved to state archived
+     */
+    retries?: number;
+};
+
+export type Task = {
+    /**
+     * Unique identifier for the task.
      */
     id: string;
     /**
-     * The current number of retries.
+     * Task source in the form namespace:name/interface/function@<hash|tag>.
+     */
+    source: string;
+    /**
+     * Parameters passed to the task.
+     */
+    params?: Array<unknown>;
+    /**
+     * Argument list used to invoke the task.
+     */
+    args?: Array<string>;
+    /**
+     * Environment variables supplied to the task.
+     */
+    env?: Array<EnvironmentVariable>;
+    /**
+     * Callback URL invoked on task completion.
+     */
+    callback?: string;
+    /**
+     * Duration to retain the task after completion.
+     */
+    retention?: string;
+    /**
+     * Maximum number of retries before the task is moved to state archived
+     */
+    retries?: number;
+    status: TaskStatus;
+};
+
+export type TaskStatus = {
+    /**
+     * Current retry count.
      */
     retries: number;
     /**
-     * The maximum number of retries allowed.
-     */
-    max_retries: number;
-    /**
-     * The current status of the task. See https://github.com/hibiken/asynq/wiki/Life-of-a-Task
+     * Current status of the task.
      */
     state: string;
     /**
-     * The result payload of the task.
+     * Result payload of the task.
      */
     result_payload?: string;
     /**
-     * The error message from the last failure
+     * Error message from the last failure.
      */
     last_error?: string;
     /**
-     * Time of the last failure. RFC 3339 format.
+     * Time of the last failure.
      */
     last_failed_at?: string;
     /**
-     * Time the task will be scheduled to be processed. RFC 3339 format.
+     * Time the task is scheduled for processing next.
      */
     next_process_at?: string;
     /**
-     * Duration the task will be retained after succeeding. Golang duration string.
-     */
-    retention: string;
-    /**
-     * Time the task successfully finished processing.
+     * Time the task finished processing.
      */
     completed_at?: string;
-    logs?: Array<TaskLog>;
 };
 
 export type TaskLog = {
     /**
-     * The time the log entry was created. RFC 3339 format.
+     * Time the log entry was created.
      */
     timestamp: string;
     /**
-     * The log level (DEBUG, INFO, WARN, ERROR, FATAL).
+     * Log level (e.g., debug, info, warn, error, fatal).
      */
     level: string;
     /**
-     * The component that issued the log entry (SYSTEM, ARTIFACT).
+     * Component that issued the log entry.
      */
     issuer: string;
     /**
-     * The log message content.
+     * Log message content.
      */
     message: string;
+};
+
+export type EnvironmentVariable = {
+    /**
+     * Environment variable name.
+     */
+    key: string;
+    /**
+     * Environment variable value.
+     */
+    value: string;
 };
 
 export type ErrGeneric = {
@@ -84,10 +149,6 @@ export type ErrField = {
 
 export type UserResponse = {
     /**
-     * The uuid of the user.
-     */
-    id: string;
-    /**
      * The name of the user.
      */
     name: string;
@@ -95,20 +156,13 @@ export type UserResponse = {
      * The display name of the user.
      */
     displayName: string;
+    /**
+     * Roles assigned to the user.
+     */
+    roles?: Array<string>;
 };
 
-export type UserRequest = {
-    /**
-     * The uuid of the user to retrieve.
-     */
-    id: string;
-};
-
-export type CreateUser = {
-    /**
-     * The name of the user to create.
-     */
-    name: string;
+export type PutUserRequest = {
     /**
      * The password for the new user.
      */
@@ -117,54 +171,40 @@ export type CreateUser = {
      * The display name for the new user.
      */
     displayName: string;
+    /**
+     * Roles assigned to the new user.
+     */
+    roles?: Array<string>;
 };
 
 export type PatchUser = {
     /**
-     * The uuid of the user to update.
+     * The password for the user.
      */
-    id: string;
+    password?: string;
     /**
-     * The new name for the user.
+     * The display name for the user.
      */
-    newName?: string;
+    displayName?: string;
     /**
-     * The new password for the user.
+     * Roles assigned to the user.
      */
-    newPassword?: string;
-    /**
-     * The new display name for the user.
-     */
-    newDisplayName?: string;
+    roles?: Array<string>;
 };
 
 export type PatchMe = {
     /**
-     * The new name for the current user.
+     * The password for the current user.
      */
-    newName?: string;
+    password?: string;
     /**
-     * The new password for the current user.
+     * The display name for the current user.
      */
-    newPassword?: string;
+    displayName?: string;
     /**
-     * The new display name for the current user.
+     * Roles assigned to the current user.
      */
-    newDisplayName?: string;
-};
-
-export type RbacRole = {
-    /**
-     * The name of the role.
-     */
-    role: string;
-};
-
-export type RbacUserRolesRequest = {
-    /**
-     * The uuid of the user.
-     */
-    userId: string;
+    roles?: Array<string>;
 };
 
 export type RbacPolicy = {
@@ -177,40 +217,69 @@ export type RbacPolicy = {
      */
     resourceGroup: string;
     /**
-     * The allowed permission (e.g., "GET", "POST", "*").
+     * The allowed HTTP method (e.g., "GET", "POST", "*").
      */
-    permission: 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'HEAD' | '*';
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | '*';
+};
+
+export type RoleResource = {
+    /**
+     * The role name.
+     */
+    name: string;
+    /**
+     * Usernames assigned to this role.
+     */
+    users: Array<string>;
+};
+
+export type PutRoleRequest = {
+    /**
+     * Usernames assigned to this role.
+     */
+    users: Array<string>;
+};
+
+export type ResourceGroupResource = {
+    /**
+     * The resource group name.
+     */
+    name: string;
+    /**
+     * Endpoints assigned to this resource group.
+     */
+    endpoints: Array<string>;
+};
+
+export type PutResourceGroupRequest = {
+    /**
+     * Endpoints assigned to this resource group.
+     */
+    endpoints: Array<string>;
 };
 
 /**
- * Package name of an artifact.
+ * Metadata of an artifact version.
  */
-export type PackageName = {
+export type Artifact = {
     /**
-     * The namespace of the artifact.
+     * Namespace of the artifact.
      */
     namespace: string;
     /**
-     * The name of the artifact.
+     * Name of the artifact.
      */
     name: string;
-};
-
-/**
- * Metadata of an artifact.
- */
-export type Artifact = {
-    package: PackageName;
     /**
-     * The version hash of the artifact.
+     * Version hash of the artifact.
      */
     versionHash: string;
     /**
-     * The creation timestamp of the artifact.
+     * Creation timestamp of the artifact.
      */
     createdAt: string;
     /**
-     * The number of times the artifact has been pulled.
+     * Number of times the artifact has been pulled.
      */
     pulls: number;
     /**
@@ -219,14 +288,91 @@ export type Artifact = {
     tags: Array<string>;
 };
 
-export type DeleteUsersUserData = {
-    body: UserRequest;
-    path?: never;
-    query?: never;
-    url: '/users/user';
+export type PatchArtifact = {
+    /**
+     * Tags to assign to the artifact version. When set, replaces the existing tags.
+     */
+    tags?: Array<string>;
 };
 
-export type DeleteUsersUserErrors = {
+export type UploadArtifactResponse = {
+    /**
+     * Created version hash.
+     */
+    versionHash: string;
+};
+
+export type GetV1UserData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Maximum number of users to return.
+         */
+        limit?: number;
+        /**
+         * Offset into the user list.
+         */
+        offset?: number;
+        /**
+         * Filter by exact username.
+         */
+        name?: string;
+        /**
+         * Filter by display name.
+         */
+        'display-name'?: string;
+    };
+    url: '/v1/user';
+};
+
+export type GetV1UserErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1UserError = GetV1UserErrors[keyof GetV1UserErrors];
+
+export type GetV1UserResponses = {
+    /**
+     * Successful response with a list of users.
+     */
+    200: Array<UserResponse>;
+};
+
+export type GetV1UserResponse = GetV1UserResponses[keyof GetV1UserResponses];
+
+export type DeleteV1UserByUsernameData = {
+    body?: never;
+    path: {
+        /**
+         * Unique name of the user.
+         */
+        username: string;
+    };
+    query?: never;
+    url: '/v1/user/{username}';
+};
+
+export type DeleteV1UserByUsernameErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -253,34 +399,30 @@ export type DeleteUsersUserErrors = {
     500: unknown;
 };
 
-export type DeleteUsersUserError = DeleteUsersUserErrors[keyof DeleteUsersUserErrors];
+export type DeleteV1UserByUsernameError = DeleteV1UserByUsernameErrors[keyof DeleteV1UserByUsernameErrors];
 
-export type DeleteUsersUserResponses = {
+export type DeleteV1UserByUsernameResponses = {
     /**
      * User deleted successfully. Returns the deleted user.
      */
     200: UserResponse;
 };
 
-export type DeleteUsersUserResponse = DeleteUsersUserResponses[keyof DeleteUsersUserResponses];
+export type DeleteV1UserByUsernameResponse = DeleteV1UserByUsernameResponses[keyof DeleteV1UserByUsernameResponses];
 
-export type GetUsersUserData = {
+export type GetV1UserByUsernameData = {
     body?: never;
-    path?: never;
-    query?: {
+    path: {
         /**
-         * The uuid of the user to retrieve.
+         * Unique name of the user.
          */
-        userId?: string;
-        /**
-         * The name of the user to retrieve.
-         */
-        name?: string;
+        username: string;
     };
-    url: '/users/user';
+    query?: never;
+    url: '/v1/user/{username}';
 };
 
-export type GetUsersUserErrors = {
+export type GetV1UserByUsernameErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -307,25 +449,30 @@ export type GetUsersUserErrors = {
     500: unknown;
 };
 
-export type GetUsersUserError = GetUsersUserErrors[keyof GetUsersUserErrors];
+export type GetV1UserByUsernameError = GetV1UserByUsernameErrors[keyof GetV1UserByUsernameErrors];
 
-export type GetUsersUserResponses = {
+export type GetV1UserByUsernameResponses = {
     /**
      * Successful response with user information.
      */
     200: UserResponse;
 };
 
-export type GetUsersUserResponse = GetUsersUserResponses[keyof GetUsersUserResponses];
+export type GetV1UserByUsernameResponse = GetV1UserByUsernameResponses[keyof GetV1UserByUsernameResponses];
 
-export type HeadUsersUserData = {
-    body: UserRequest;
-    path?: never;
+export type HeadV1UserByUsernameData = {
+    body?: never;
+    path: {
+        /**
+         * Unique name of the user.
+         */
+        username: string;
+    };
     query?: never;
-    url: '/users/user';
+    url: '/v1/user/{username}';
 };
 
-export type HeadUsersUserErrors = {
+export type HeadV1UserByUsernameErrors = {
     /**
      * Bad request.
      */
@@ -352,23 +499,28 @@ export type HeadUsersUserErrors = {
     500: unknown;
 };
 
-export type HeadUsersUserError = HeadUsersUserErrors[keyof HeadUsersUserErrors];
+export type HeadV1UserByUsernameError = HeadV1UserByUsernameErrors[keyof HeadV1UserByUsernameErrors];
 
-export type HeadUsersUserResponses = {
+export type HeadV1UserByUsernameResponses = {
     /**
      * User exists.
      */
     200: unknown;
 };
 
-export type PatchUsersUserData = {
+export type PatchV1UserByUsernameData = {
     body: PatchUser;
-    path?: never;
+    path: {
+        /**
+         * Unique name of the user.
+         */
+        username: string;
+    };
     query?: never;
-    url: '/users/user';
+    url: '/v1/user/{username}';
 };
 
-export type PatchUsersUserErrors = {
+export type PatchV1UserByUsernameErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -399,25 +551,30 @@ export type PatchUsersUserErrors = {
     500: unknown;
 };
 
-export type PatchUsersUserError = PatchUsersUserErrors[keyof PatchUsersUserErrors];
+export type PatchV1UserByUsernameError = PatchV1UserByUsernameErrors[keyof PatchV1UserByUsernameErrors];
 
-export type PatchUsersUserResponses = {
+export type PatchV1UserByUsernameResponses = {
     /**
      * User updated successfully.
      */
     200: UserResponse;
 };
 
-export type PatchUsersUserResponse = PatchUsersUserResponses[keyof PatchUsersUserResponses];
+export type PatchV1UserByUsernameResponse = PatchV1UserByUsernameResponses[keyof PatchV1UserByUsernameResponses];
 
-export type PostUsersUserData = {
-    body: CreateUser;
-    path?: never;
+export type PutV1UserByUsernameData = {
+    body: PutUserRequest;
+    path: {
+        /**
+         * Unique name of the user.
+         */
+        username: string;
+    };
     query?: never;
-    url: '/users/user';
+    url: '/v1/user/{username}';
 };
 
-export type PostUsersUserErrors = {
+export type PutV1UserByUsernameErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -444,25 +601,25 @@ export type PostUsersUserErrors = {
     500: unknown;
 };
 
-export type PostUsersUserError = PostUsersUserErrors[keyof PostUsersUserErrors];
+export type PutV1UserByUsernameError = PutV1UserByUsernameErrors[keyof PutV1UserByUsernameErrors];
 
-export type PostUsersUserResponses = {
+export type PutV1UserByUsernameResponses = {
     /**
      * User created successfully.
      */
     201: UserResponse;
 };
 
-export type PostUsersUserResponse = PostUsersUserResponses[keyof PostUsersUserResponses];
+export type PutV1UserByUsernameResponse = PutV1UserByUsernameResponses[keyof PutV1UserByUsernameResponses];
 
-export type GetUsersListData = {
+export type DeleteV1UserMeData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/users/list';
+    url: '/v1/user/me';
 };
 
-export type GetUsersListErrors = {
+export type DeleteV1UserMeErrors = {
     /**
      * The provided authentication credentials were invalid.
      */
@@ -481,62 +638,25 @@ export type GetUsersListErrors = {
     500: unknown;
 };
 
-export type GetUsersListError = GetUsersListErrors[keyof GetUsersListErrors];
+export type DeleteV1UserMeError = DeleteV1UserMeErrors[keyof DeleteV1UserMeErrors];
 
-export type GetUsersListResponses = {
-    /**
-     * Successful response with a list of users.
-     */
-    200: Array<UserResponse>;
-};
-
-export type GetUsersListResponse = GetUsersListResponses[keyof GetUsersListResponses];
-
-export type DeleteUsersMeData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/users/me';
-};
-
-export type DeleteUsersMeErrors = {
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type DeleteUsersMeError = DeleteUsersMeErrors[keyof DeleteUsersMeErrors];
-
-export type DeleteUsersMeResponses = {
+export type DeleteV1UserMeResponses = {
     /**
      * Current user deleted successfully. Returns the deleted user.
      */
     200: UserResponse;
 };
 
-export type DeleteUsersMeResponse = DeleteUsersMeResponses[keyof DeleteUsersMeResponses];
+export type DeleteV1UserMeResponse = DeleteV1UserMeResponses[keyof DeleteV1UserMeResponses];
 
-export type GetUsersMeData = {
+export type GetV1UserMeData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/users/me';
+    url: '/v1/user/me';
 };
 
-export type GetUsersMeErrors = {
+export type GetV1UserMeErrors = {
     /**
      * The provided authentication credentials were invalid.
      */
@@ -555,25 +675,25 @@ export type GetUsersMeErrors = {
     500: unknown;
 };
 
-export type GetUsersMeError = GetUsersMeErrors[keyof GetUsersMeErrors];
+export type GetV1UserMeError = GetV1UserMeErrors[keyof GetV1UserMeErrors];
 
-export type GetUsersMeResponses = {
+export type GetV1UserMeResponses = {
     /**
      * Successful response with current user information.
      */
     200: UserResponse;
 };
 
-export type GetUsersMeResponse = GetUsersMeResponses[keyof GetUsersMeResponses];
+export type GetV1UserMeResponse = GetV1UserMeResponses[keyof GetV1UserMeResponses];
 
-export type PatchUsersMeData = {
+export type PatchV1UserMeData = {
     body: PatchMe;
     path?: never;
     query?: never;
-    url: '/users/me';
+    url: '/v1/user/me';
 };
 
-export type PatchUsersMeErrors = {
+export type PatchV1UserMeErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -600,25 +720,38 @@ export type PatchUsersMeErrors = {
     500: unknown;
 };
 
-export type PatchUsersMeError = PatchUsersMeErrors[keyof PatchUsersMeErrors];
+export type PatchV1UserMeError = PatchV1UserMeErrors[keyof PatchV1UserMeErrors];
 
-export type PatchUsersMeResponses = {
+export type PatchV1UserMeResponses = {
     /**
      * Current user updated successfully.
      */
     200: UserResponse;
 };
 
-export type PatchUsersMeResponse = PatchUsersMeResponses[keyof PatchUsersMeResponses];
+export type PatchV1UserMeResponse = PatchV1UserMeResponses[keyof PatchV1UserMeResponses];
 
-export type GetRbacListRolesData = {
+export type GetV1RbacRoleData = {
     body?: never;
     path?: never;
-    query?: never;
-    url: '/rbac/list-roles';
+    query?: {
+        /**
+         * Maximum number of policies to return.
+         */
+        limit?: number;
+        /**
+         * Offset into the policy list.
+         */
+        offset?: number;
+        /**
+         * Filter policies by role.
+         */
+        role?: string;
+    };
+    url: '/v1/rbac/role';
 };
 
-export type GetRbacListRolesErrors = {
+export type GetV1RbacRoleErrors = {
     /**
      * The provided authentication credentials were invalid.
      */
@@ -637,25 +770,30 @@ export type GetRbacListRolesErrors = {
     500: unknown;
 };
 
-export type GetRbacListRolesError = GetRbacListRolesErrors[keyof GetRbacListRolesErrors];
+export type GetV1RbacRoleError = GetV1RbacRoleErrors[keyof GetV1RbacRoleErrors];
 
-export type GetRbacListRolesResponses = {
+export type GetV1RbacRoleResponses = {
     /**
      * Successful response with a list of roles.
      */
-    200: Array<string>;
+    200: Array<RoleResource>;
 };
 
-export type GetRbacListRolesResponse = GetRbacListRolesResponses[keyof GetRbacListRolesResponses];
+export type GetV1RbacRoleResponse = GetV1RbacRoleResponses[keyof GetV1RbacRoleResponses];
 
-export type DeleteRbacRoleData = {
-    body: RbacRole;
-    path?: never;
+export type DeleteV1RbacRoleByRoleData = {
+    body?: never;
+    path: {
+        /**
+         * The name of the role.
+         */
+        role: string;
+    };
     query?: never;
-    url: '/rbac/role';
+    url: '/v1/rbac/role/{role}';
 };
 
-export type DeleteRbacRoleErrors = {
+export type DeleteV1RbacRoleByRoleErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -673,7 +811,7 @@ export type DeleteRbacRoleErrors = {
      */
     404: ErrGeneric;
     /**
-     * Role is still assigned to users.
+     * Tried to delete enclave admin role
      */
     409: ErrGeneric;
     /**
@@ -686,28 +824,30 @@ export type DeleteRbacRoleErrors = {
     500: unknown;
 };
 
-export type DeleteRbacRoleError = DeleteRbacRoleErrors[keyof DeleteRbacRoleErrors];
+export type DeleteV1RbacRoleByRoleError = DeleteV1RbacRoleByRoleErrors[keyof DeleteV1RbacRoleByRoleErrors];
 
-export type DeleteRbacRoleResponses = {
+export type DeleteV1RbacRoleByRoleResponses = {
     /**
      * Roles deleted successfully.
      */
-    200: unknown;
+    200: RoleResource;
 };
 
-export type GetRbacRoleData = {
+export type DeleteV1RbacRoleByRoleResponse = DeleteV1RbacRoleByRoleResponses[keyof DeleteV1RbacRoleByRoleResponses];
+
+export type GetV1RbacRoleByRoleData = {
     body?: never;
-    path?: never;
-    query: {
+    path: {
         /**
          * The name of the role.
          */
         role: string;
     };
-    url: '/rbac/role';
+    query?: never;
+    url: '/v1/rbac/role/{role}';
 };
 
-export type GetRbacRoleErrors = {
+export type GetV1RbacRoleByRoleErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -734,25 +874,30 @@ export type GetRbacRoleErrors = {
     500: unknown;
 };
 
-export type GetRbacRoleError = GetRbacRoleErrors[keyof GetRbacRoleErrors];
+export type GetV1RbacRoleByRoleError = GetV1RbacRoleByRoleErrors[keyof GetV1RbacRoleByRoleErrors];
 
-export type GetRbacRoleResponses = {
+export type GetV1RbacRoleByRoleResponses = {
     /**
-     * Successful response with a list of users assigned to the role.
+     * Successful response with the role resource.
      */
-    200: Array<string>;
+    200: RoleResource;
 };
 
-export type GetRbacRoleResponse = GetRbacRoleResponses[keyof GetRbacRoleResponses];
+export type GetV1RbacRoleByRoleResponse = GetV1RbacRoleByRoleResponses[keyof GetV1RbacRoleByRoleResponses];
 
-export type HeadRbacRoleData = {
-    body: RbacRole;
-    path?: never;
+export type HeadV1RbacRoleByRoleData = {
+    body?: never;
+    path: {
+        /**
+         * The name of the role.
+         */
+        role: string;
+    };
     query?: never;
-    url: '/rbac/role';
+    url: '/v1/rbac/role/{role}';
 };
 
-export type HeadRbacRoleErrors = {
+export type HeadV1RbacRoleByRoleErrors = {
     /**
      * Bad request.
      */
@@ -779,23 +924,28 @@ export type HeadRbacRoleErrors = {
     500: unknown;
 };
 
-export type HeadRbacRoleError = HeadRbacRoleErrors[keyof HeadRbacRoleErrors];
+export type HeadV1RbacRoleByRoleError = HeadV1RbacRoleByRoleErrors[keyof HeadV1RbacRoleByRoleErrors];
 
-export type HeadRbacRoleResponses = {
+export type HeadV1RbacRoleByRoleResponses = {
     /**
      * Role exists.
      */
     200: unknown;
 };
 
-export type PostRbacRoleData = {
-    body: RbacRole;
-    path?: never;
+export type PutV1RbacRoleByRoleData = {
+    body: PutRoleRequest;
+    path: {
+        /**
+         * The name of the role.
+         */
+        role: string;
+    };
     query?: never;
-    url: '/rbac/role';
+    url: '/v1/rbac/role/{role}';
 };
 
-export type PostRbacRoleErrors = {
+export type PutV1RbacRoleByRoleErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -822,177 +972,38 @@ export type PostRbacRoleErrors = {
     500: unknown;
 };
 
-export type PostRbacRoleError = PostRbacRoleErrors[keyof PostRbacRoleErrors];
+export type PutV1RbacRoleByRoleError = PutV1RbacRoleByRoleErrors[keyof PutV1RbacRoleByRoleErrors];
 
-export type PostRbacRoleResponses = {
+export type PutV1RbacRoleByRoleResponses = {
     /**
      * Role created successfully.
      */
-    201: unknown;
+    201: RoleResource;
 };
 
-export type DeleteRbacUserData = {
-    body: {
-        /**
-         * The uuid of the user.
-         */
-        userId: string;
-        /**
-         * The name of the role to remove from the user.
-         */
-        role: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/rbac/user';
-};
+export type PutV1RbacRoleByRoleResponse = PutV1RbacRoleByRoleResponses[keyof PutV1RbacRoleByRoleResponses];
 
-export type DeleteRbacUserErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type DeleteRbacUserError = DeleteRbacUserErrors[keyof DeleteRbacUserErrors];
-
-export type DeleteRbacUserResponses = {
-    /**
-     * Role removed from user successfully.
-     */
-    200: unknown;
-};
-
-export type GetRbacUserData = {
+export type GetV1RbacResourceGroupData = {
     body?: never;
     path?: never;
-    query: {
+    query?: {
         /**
-         * The uuid of the user.
+         * Maximum number of policies to return.
          */
-        userId: string;
+        limit?: number;
+        /**
+         * Offset into the policy list.
+         */
+        offset?: number;
+        /**
+         * Filter policies by role.
+         */
+        role?: string;
     };
-    url: '/rbac/user';
+    url: '/v1/rbac/resource-group';
 };
 
-export type GetRbacUserErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type GetRbacUserError = GetRbacUserErrors[keyof GetRbacUserErrors];
-
-export type GetRbacUserResponses = {
-    /**
-     * Successful response with a list of roles assigned to the user.
-     */
-    200: Array<string>;
-};
-
-export type GetRbacUserResponse = GetRbacUserResponses[keyof GetRbacUserResponses];
-
-export type PostRbacUserData = {
-    body: {
-        /**
-         * The uuid of the user.
-         */
-        userId: string;
-        /**
-         * The name of the role to assign to the user.
-         */
-        role: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/rbac/user';
-};
-
-export type PostRbacUserErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type PostRbacUserError = PostRbacUserErrors[keyof PostRbacUserErrors];
-
-export type PostRbacUserResponses = {
-    /**
-     * Role assigned to user successfully or role was already assigned.
-     */
-    201: unknown;
-};
-
-export type GetRbacListResourceGroupsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/rbac/list-resource-groups';
-};
-
-export type GetRbacListResourceGroupsErrors = {
+export type GetV1RbacResourceGroupErrors = {
     /**
      * The provided authentication credentials were invalid.
      */
@@ -1011,30 +1022,30 @@ export type GetRbacListResourceGroupsErrors = {
     500: unknown;
 };
 
-export type GetRbacListResourceGroupsError = GetRbacListResourceGroupsErrors[keyof GetRbacListResourceGroupsErrors];
+export type GetV1RbacResourceGroupError = GetV1RbacResourceGroupErrors[keyof GetV1RbacResourceGroupErrors];
 
-export type GetRbacListResourceGroupsResponses = {
+export type GetV1RbacResourceGroupResponses = {
     /**
      * Successful response with a list of resource groups.
      */
-    200: Array<string>;
+    200: Array<ResourceGroupResource>;
 };
 
-export type GetRbacListResourceGroupsResponse = GetRbacListResourceGroupsResponses[keyof GetRbacListResourceGroupsResponses];
+export type GetV1RbacResourceGroupResponse = GetV1RbacResourceGroupResponses[keyof GetV1RbacResourceGroupResponses];
 
-export type DeleteRbacResourceGroupData = {
-    body: {
+export type DeleteV1RbacResourceGroupByResourceGroupData = {
+    body?: never;
+    path: {
         /**
          * The name of the resource group.
          */
         resourceGroup: string;
     };
-    path?: never;
     query?: never;
-    url: '/rbac/resource-group';
+    url: '/v1/rbac/resource-group/{resourceGroup}';
 };
 
-export type DeleteRbacResourceGroupErrors = {
+export type DeleteV1RbacResourceGroupByResourceGroupErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1061,28 +1072,30 @@ export type DeleteRbacResourceGroupErrors = {
     500: unknown;
 };
 
-export type DeleteRbacResourceGroupError = DeleteRbacResourceGroupErrors[keyof DeleteRbacResourceGroupErrors];
+export type DeleteV1RbacResourceGroupByResourceGroupError = DeleteV1RbacResourceGroupByResourceGroupErrors[keyof DeleteV1RbacResourceGroupByResourceGroupErrors];
 
-export type DeleteRbacResourceGroupResponses = {
+export type DeleteV1RbacResourceGroupByResourceGroupResponses = {
     /**
      * Resource group deleted successfully.
      */
-    200: unknown;
+    200: ResourceGroupResource;
 };
 
-export type GetRbacResourceGroupData = {
+export type DeleteV1RbacResourceGroupByResourceGroupResponse = DeleteV1RbacResourceGroupByResourceGroupResponses[keyof DeleteV1RbacResourceGroupByResourceGroupResponses];
+
+export type GetV1RbacResourceGroupByResourceGroupData = {
     body?: never;
-    path?: never;
-    query: {
+    path: {
         /**
          * The name of the resource group.
          */
         resourceGroup: string;
     };
-    url: '/rbac/resource-group';
+    query?: never;
+    url: '/v1/rbac/resource-group/{resourceGroup}';
 };
 
-export type GetRbacResourceGroupErrors = {
+export type GetV1RbacResourceGroupByResourceGroupErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1109,30 +1122,30 @@ export type GetRbacResourceGroupErrors = {
     500: unknown;
 };
 
-export type GetRbacResourceGroupError = GetRbacResourceGroupErrors[keyof GetRbacResourceGroupErrors];
+export type GetV1RbacResourceGroupByResourceGroupError = GetV1RbacResourceGroupByResourceGroupErrors[keyof GetV1RbacResourceGroupByResourceGroupErrors];
 
-export type GetRbacResourceGroupResponses = {
+export type GetV1RbacResourceGroupByResourceGroupResponses = {
     /**
-     * Successful response with a list of roles assigned to the resource group.
+     * Successful response with the resource group resource.
      */
-    200: Array<string>;
+    200: ResourceGroupResource;
 };
 
-export type GetRbacResourceGroupResponse = GetRbacResourceGroupResponses[keyof GetRbacResourceGroupResponses];
+export type GetV1RbacResourceGroupByResourceGroupResponse = GetV1RbacResourceGroupByResourceGroupResponses[keyof GetV1RbacResourceGroupByResourceGroupResponses];
 
-export type HeadRbacResourceGroupData = {
-    body: {
+export type HeadV1RbacResourceGroupByResourceGroupData = {
+    body?: never;
+    path: {
         /**
          * The name of the resource group.
          */
         resourceGroup: string;
     };
-    path?: never;
     query?: never;
-    url: '/rbac/resource-group';
+    url: '/v1/rbac/resource-group/{resourceGroup}';
 };
 
-export type HeadRbacResourceGroupErrors = {
+export type HeadV1RbacResourceGroupByResourceGroupErrors = {
     /**
      * Bad request.
      */
@@ -1159,28 +1172,28 @@ export type HeadRbacResourceGroupErrors = {
     500: unknown;
 };
 
-export type HeadRbacResourceGroupError = HeadRbacResourceGroupErrors[keyof HeadRbacResourceGroupErrors];
+export type HeadV1RbacResourceGroupByResourceGroupError = HeadV1RbacResourceGroupByResourceGroupErrors[keyof HeadV1RbacResourceGroupByResourceGroupErrors];
 
-export type HeadRbacResourceGroupResponses = {
+export type HeadV1RbacResourceGroupByResourceGroupResponses = {
     /**
      * Resource group exists.
      */
     200: unknown;
 };
 
-export type PostRbacResourceGroupData = {
-    body: {
+export type PutV1RbacResourceGroupByResourceGroupData = {
+    body: PutResourceGroupRequest;
+    path: {
         /**
          * The name of the resource group.
          */
         resourceGroup: string;
     };
-    path?: never;
     query?: never;
-    url: '/rbac/resource-group';
+    url: '/v1/rbac/resource-group/{resourceGroup}';
 };
 
-export type PostRbacResourceGroupErrors = {
+export type PutV1RbacResourceGroupByResourceGroupErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1207,173 +1220,25 @@ export type PostRbacResourceGroupErrors = {
     500: unknown;
 };
 
-export type PostRbacResourceGroupError = PostRbacResourceGroupErrors[keyof PostRbacResourceGroupErrors];
+export type PutV1RbacResourceGroupByResourceGroupError = PutV1RbacResourceGroupByResourceGroupErrors[keyof PutV1RbacResourceGroupByResourceGroupErrors];
 
-export type PostRbacResourceGroupResponses = {
+export type PutV1RbacResourceGroupByResourceGroupResponses = {
     /**
      * Resource group created successfully.
      */
-    201: unknown;
+    201: ResourceGroupResource;
 };
 
-export type DeleteRbacEndpointData = {
-    body: {
-        /**
-         * The endpoint to remove from its resource group.
-         */
-        endpoint: string;
-        /**
-         * The name of the resource group.
-         */
-        resourceGroup: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/rbac/endpoint';
-};
+export type PutV1RbacResourceGroupByResourceGroupResponse = PutV1RbacResourceGroupByResourceGroupResponses[keyof PutV1RbacResourceGroupByResourceGroupResponses];
 
-export type DeleteRbacEndpointErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type DeleteRbacEndpointError = DeleteRbacEndpointErrors[keyof DeleteRbacEndpointErrors];
-
-export type DeleteRbacEndpointResponses = {
-    /**
-     * Endpoint removed from resource group successfully.
-     */
-    200: unknown;
-};
-
-export type GetRbacEndpointData = {
-    body?: never;
-    path?: never;
-    query: {
-        /**
-         * The endpoint to query.
-         */
-        endpoint: string;
-    };
-    url: '/rbac/endpoint';
-};
-
-export type GetRbacEndpointErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type GetRbacEndpointError = GetRbacEndpointErrors[keyof GetRbacEndpointErrors];
-
-export type GetRbacEndpointResponses = {
-    /**
-     * Successful response with the resource group assigned to the endpoint. Empty array if endpoint is not assigned to any resource group.
-     */
-    200: Array<string>;
-};
-
-export type GetRbacEndpointResponse = GetRbacEndpointResponses[keyof GetRbacEndpointResponses];
-
-export type PostRbacEndpointData = {
-    body: {
-        /**
-         * The name of the resource group.
-         */
-        resourceGroup: string;
-        /**
-         * The endpoint to assign to the resource group.
-         */
-        endpoint: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/rbac/endpoint';
-};
-
-export type PostRbacEndpointErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type PostRbacEndpointError = PostRbacEndpointErrors[keyof PostRbacEndpointErrors];
-
-export type PostRbacEndpointResponses = {
-    /**
-     * Endpoint assigned to resource group successfully or was already assigned.
-     */
-    201: unknown;
-};
-
-export type DeleteRbacPolicyData = {
+export type DeleteV1RbacPolicyData = {
     body: RbacPolicy;
     path?: never;
     query?: never;
-    url: '/rbac/policy';
+    url: '/v1/rbac/policy';
 };
 
-export type DeleteRbacPolicyErrors = {
+export type DeleteV1RbacPolicyErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1387,6 +1252,10 @@ export type DeleteRbacPolicyErrors = {
      */
     403: unknown;
     /**
+     * Tried to delete enclave admin policy
+     */
+    409: ErrGeneric;
+    /**
      * The request payload is too large.
      */
     413: ErrGeneric;
@@ -1396,23 +1265,44 @@ export type DeleteRbacPolicyErrors = {
     500: unknown;
 };
 
-export type DeleteRbacPolicyError = DeleteRbacPolicyErrors[keyof DeleteRbacPolicyErrors];
+export type DeleteV1RbacPolicyError = DeleteV1RbacPolicyErrors[keyof DeleteV1RbacPolicyErrors];
 
-export type DeleteRbacPolicyResponses = {
+export type DeleteV1RbacPolicyResponses = {
     /**
      * RBAC policy deleted successfully.
      */
     200: unknown;
 };
 
-export type GetRbacPolicyData = {
+export type GetV1RbacPolicyData = {
     body?: never;
     path?: never;
-    query?: never;
-    url: '/rbac/policy';
+    query?: {
+        /**
+         * Maximum number of policies to return.
+         */
+        limit?: number;
+        /**
+         * Offset into the policy list.
+         */
+        offset?: number;
+        /**
+         * Filter policies by role.
+         */
+        role?: string;
+        /**
+         * Filter policies by resource group.
+         */
+        'resource-group'?: string;
+        /**
+         * Filter policies by HTTP method.
+         */
+        method?: string;
+    };
+    url: '/v1/rbac/policy';
 };
 
-export type GetRbacPolicyErrors = {
+export type GetV1RbacPolicyErrors = {
     /**
      * The provided authentication credentials were invalid.
      */
@@ -1431,25 +1321,25 @@ export type GetRbacPolicyErrors = {
     500: unknown;
 };
 
-export type GetRbacPolicyError = GetRbacPolicyErrors[keyof GetRbacPolicyErrors];
+export type GetV1RbacPolicyError = GetV1RbacPolicyErrors[keyof GetV1RbacPolicyErrors];
 
-export type GetRbacPolicyResponses = {
+export type GetV1RbacPolicyResponses = {
     /**
      * Successful response with a list of RBAC policies.
      */
     200: Array<RbacPolicy>;
 };
 
-export type GetRbacPolicyResponse = GetRbacPolicyResponses[keyof GetRbacPolicyResponses];
+export type GetV1RbacPolicyResponse = GetV1RbacPolicyResponses[keyof GetV1RbacPolicyResponses];
 
-export type PostRbacPolicyData = {
+export type PutV1RbacPolicyData = {
     body: RbacPolicy;
     path?: never;
     query?: never;
-    url: '/rbac/policy';
+    url: '/v1/rbac/policy';
 };
 
-export type PostRbacPolicyErrors = {
+export type PutV1RbacPolicyErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1478,198 +1368,32 @@ export type PostRbacPolicyErrors = {
     500: unknown;
 };
 
-export type PostRbacPolicyError = PostRbacPolicyErrors[keyof PostRbacPolicyErrors];
+export type PutV1RbacPolicyError = PutV1RbacPolicyErrors[keyof PutV1RbacPolicyErrors];
 
-export type PostRbacPolicyResponses = {
+export type PutV1RbacPolicyResponses = {
     /**
      * RBAC policy created successfully.
      */
     201: unknown;
 };
 
-export type DeleteArtifactData = {
-    body: {
-        package: PackageName;
+export type PostV1ArtifactRawByNamespaceByNameData = {
+    body: Blob | File;
+    path: {
         /**
-         * Either the version hash or tag of the artifact.
-         */
-        identifier: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/artifact';
-};
-
-export type DeleteArtifactErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type DeleteArtifactError = DeleteArtifactErrors[keyof DeleteArtifactErrors];
-
-export type DeleteArtifactResponses = {
-    /**
-     * Artifact deleted successfully. Returns the deleted artifact metadata.
-     */
-    200: Artifact;
-};
-
-export type DeleteArtifactResponse = DeleteArtifactResponses[keyof DeleteArtifactResponses];
-
-export type GetArtifactData = {
-    body?: never;
-    path?: never;
-    query: {
-        /**
-         * The namespace of the artifact.
+         * Artifact namespace.
          */
         namespace: string;
         /**
-         * The name of the artifact.
+         * Artifact name.
          */
         name: string;
-        /**
-         * Either the version hash or tag of the artifact.
-         */
-        identifier: string;
     };
-    url: '/artifact';
-};
-
-export type GetArtifactErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type GetArtifactError = GetArtifactErrors[keyof GetArtifactErrors];
-
-export type GetArtifactResponses = {
-    /**
-     * Successful response with artifact metadata.
-     */
-    200: Artifact;
-};
-
-export type GetArtifactResponse = GetArtifactResponses[keyof GetArtifactResponses];
-
-export type HeadArtifactData = {
-    body?: never;
-    path?: never;
-    query: {
-        /**
-         * The namespace of the artifact.
-         */
-        namespace: string;
-        /**
-         * The name of the artifact.
-         */
-        name: string;
-        /**
-         * Either the version hash or tag of the artifact.
-         */
-        identifier: string;
-    };
-    url: '/artifact';
-};
-
-export type HeadArtifactErrors = {
-    /**
-     * Bad request.
-     */
-    400: unknown;
-    /**
-     * Unauthorized.
-     */
-    401: unknown;
-    /**
-     * Forbidden.
-     */
-    403: unknown;
-    /**
-     * Artifact does not exist.
-     */
-    404: unknown;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * Internal server error.
-     */
-    500: unknown;
-};
-
-export type HeadArtifactError = HeadArtifactErrors[keyof HeadArtifactErrors];
-
-export type HeadArtifactResponses = {
-    /**
-     * Artifact exists.
-     */
-    200: unknown;
-};
-
-export type DeleteArtifactTagData = {
-    body: {
-        package: PackageName;
-        /**
-         * The version hash of the artifact to untag.
-         */
-        versionHash: string;
-        /**
-         * The tag to remove from the artifact.
-         */
-        tag: string;
-    };
-    path?: never;
     query?: never;
-    url: '/artifact/tag';
+    url: '/v1/artifact/raw/{namespace}/{name}';
 };
 
-export type DeleteArtifactTagErrors = {
+export type PostV1ArtifactRawByNamespaceByNameErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1683,178 +1407,7 @@ export type DeleteArtifactTagErrors = {
      */
     403: unknown;
     /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type DeleteArtifactTagError = DeleteArtifactTagErrors[keyof DeleteArtifactTagErrors];
-
-export type DeleteArtifactTagResponses = {
-    /**
-     * Tag removed from artifact successfully.
-     */
-    200: unknown;
-};
-
-export type PostArtifactTagData = {
-    body: {
-        package: PackageName;
-        /**
-         * The version hash of the artifact to tag.
-         */
-        versionHash: string;
-        /**
-         * The new tag to assign to the artifact version.
-         */
-        newTag: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/artifact/tag';
-};
-
-export type PostArtifactTagErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type PostArtifactTagError = PostArtifactTagErrors[keyof PostArtifactTagErrors];
-
-export type PostArtifactTagResponses = {
-    /**
-     * Tag assigned to artifact version successfully.
-     */
-    201: unknown;
-};
-
-export type GetArtifactUploadData = {
-    body?: never;
-    path?: never;
-    query: {
-        /**
-         * The namespace of the artifact.
-         */
-        namespace: string;
-        /**
-         * The name of the artifact.
-         */
-        name: string;
-        /**
-         * Either the version hash or tag of the artifact.
-         */
-        identifier: string;
-    };
-    url: '/artifact/upload';
-};
-
-export type GetArtifactUploadErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * The requested resource was not found.
-     */
-    404: ErrGeneric;
-    /**
-     * The request payload is too large.
-     */
-    413: ErrGeneric;
-    /**
-     * An internal server error occurred. Look at the server logs for more details.
-     */
-    500: unknown;
-};
-
-export type GetArtifactUploadError = GetArtifactUploadErrors[keyof GetArtifactUploadErrors];
-
-export type GetArtifactUploadResponses = {
-    /**
-     * Successful response with artifact file.
-     */
-    200: Blob | File;
-};
-
-export type GetArtifactUploadResponse = GetArtifactUploadResponses[keyof GetArtifactUploadResponses];
-
-export type PostArtifactUploadData = {
-    body: {
-        /**
-         * The namespace of the artifact.
-         */
-        namespace: string;
-        /**
-         * The name of the artifact.
-         */
-        name: string;
-        /**
-         * Tags to assign to the artifact.
-         */
-        tag?: Array<string>;
-        /**
-         * The artifact file to upload.
-         */
-        file: Blob | File;
-    };
-    path?: never;
-    query?: never;
-    url: '/artifact/upload';
-};
-
-export type PostArtifactUploadErrors = {
-    /**
-     * The request was malformed or invalid.
-     */
-    400: ErrGeneric;
-    /**
-     * The provided authentication credentials were invalid.
-     */
-    401: unknown;
-    /**
-     * The authenticated user does not have permission to access the requested resource.
-     */
-    403: unknown;
-    /**
-     * Artifact already exists.
+     * Artifact already exists at the provided tag or hash.
      */
     409: ErrGeneric;
     /**
@@ -1867,34 +1420,34 @@ export type PostArtifactUploadErrors = {
     500: unknown;
 };
 
-export type PostArtifactUploadError = PostArtifactUploadErrors[keyof PostArtifactUploadErrors];
+export type PostV1ArtifactRawByNamespaceByNameError = PostV1ArtifactRawByNamespaceByNameErrors[keyof PostV1ArtifactRawByNamespaceByNameErrors];
 
-export type PostArtifactUploadResponses = {
+export type PostV1ArtifactRawByNamespaceByNameResponses = {
     /**
      * Artifact uploaded successfully.
      */
-    201: Artifact;
+    201: UploadArtifactResponse;
 };
 
-export type PostArtifactUploadResponse = PostArtifactUploadResponses[keyof PostArtifactUploadResponses];
+export type PostV1ArtifactRawByNamespaceByNameResponse = PostV1ArtifactRawByNamespaceByNameResponses[keyof PostV1ArtifactRawByNamespaceByNameResponses];
 
-export type GetArtifactListData = {
+export type GetV1ArtifactData = {
     body?: never;
     path?: never;
     query?: {
         /**
-         * The namespace of the artifact.
+         * Maximum number of namespaces to return.
          */
-        namespace?: string;
+        limit?: number;
         /**
-         * The name of the artifact.
+         * Offset into the namespace list.
          */
-        name?: string;
+        offset?: number;
     };
-    url: '/artifact/list';
+    url: '/v1/artifact';
 };
 
-export type GetArtifactListErrors = {
+export type GetV1ArtifactErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1917,25 +1470,39 @@ export type GetArtifactListErrors = {
     500: unknown;
 };
 
-export type GetArtifactListError = GetArtifactListErrors[keyof GetArtifactListErrors];
+export type GetV1ArtifactError = GetV1ArtifactErrors[keyof GetV1ArtifactErrors];
 
-export type GetArtifactListResponses = {
+export type GetV1ArtifactResponses = {
     /**
-     * Successful response with a list of artifact metadata.
+     * Artifact namespace list.
      */
     200: Array<Artifact>;
 };
 
-export type GetArtifactListResponse = GetArtifactListResponses[keyof GetArtifactListResponses];
+export type GetV1ArtifactResponse = GetV1ArtifactResponses[keyof GetV1ArtifactResponses];
 
-export type PostManifestData = {
-    body: unknown;
-    path?: never;
-    query?: never;
-    url: '/manifest';
+export type GetV1ArtifactByNamespaceData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+    };
+    query?: {
+        /**
+         * Maximum number of artifacts to return.
+         */
+        limit?: number;
+        /**
+         * Offset into the artifact list.
+         */
+        offset?: number;
+    };
+    url: '/v1/artifact/{namespace}';
 };
 
-export type PostManifestErrors = {
+export type GetV1ArtifactByNamespaceErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1949,34 +1516,570 @@ export type PostManifestErrors = {
      */
     403: unknown;
     /**
-     * A manifest with the given name already exists.
+     * The request payload is too large.
      */
-    409: ErrGeneric;
+    413: ErrGeneric;
     /**
      * An internal server error occurred. Look at the server logs for more details.
      */
     500: unknown;
 };
 
-export type PostManifestError = PostManifestErrors[keyof PostManifestErrors];
+export type GetV1ArtifactByNamespaceError = GetV1ArtifactByNamespaceErrors[keyof GetV1ArtifactByNamespaceErrors];
 
-export type PostManifestResponses = {
+export type GetV1ArtifactByNamespaceResponses = {
     /**
-     * Manifest created successfully. Returns the resource id
+     * Artifact list for namespace.
      */
-    201: string;
+    200: Array<Artifact>;
 };
 
-export type PostManifestResponse = PostManifestResponses[keyof PostManifestResponses];
+export type GetV1ArtifactByNamespaceResponse = GetV1ArtifactByNamespaceResponses[keyof GetV1ArtifactByNamespaceResponses];
 
-export type GetTasksListData = {
+export type GetV1ArtifactByNamespaceByNameData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+    };
+    query?: {
+        /**
+         * Maximum number of versions to return.
+         */
+        limit?: number;
+        /**
+         * Offset into the version list.
+         */
+        offset?: number;
+    };
+    url: '/v1/artifact/{namespace}/{name}';
+};
+
+export type GetV1ArtifactByNamespaceByNameErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1ArtifactByNamespaceByNameError = GetV1ArtifactByNamespaceByNameErrors[keyof GetV1ArtifactByNamespaceByNameErrors];
+
+export type GetV1ArtifactByNamespaceByNameResponses = {
+    /**
+     * Artifact version list.
+     */
+    200: Array<Artifact>;
+};
+
+export type GetV1ArtifactByNamespaceByNameResponse = GetV1ArtifactByNamespaceByNameResponses[keyof GetV1ArtifactByNamespaceByNameResponses];
+
+export type DeleteV1ArtifactByNamespaceByNameTagByTagData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Tag pointing to the desired version.
+         */
+        tag: string;
+    };
+    query?: never;
+    url: '/v1/artifact/{namespace}/{name}/tag/{tag}';
+};
+
+export type DeleteV1ArtifactByNamespaceByNameTagByTagErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type DeleteV1ArtifactByNamespaceByNameTagByTagError = DeleteV1ArtifactByNamespaceByNameTagByTagErrors[keyof DeleteV1ArtifactByNamespaceByNameTagByTagErrors];
+
+export type DeleteV1ArtifactByNamespaceByNameTagByTagResponses = {
+    /**
+     * Artifact deleted successfully.
+     */
+    200: Artifact;
+};
+
+export type DeleteV1ArtifactByNamespaceByNameTagByTagResponse = DeleteV1ArtifactByNamespaceByNameTagByTagResponses[keyof DeleteV1ArtifactByNamespaceByNameTagByTagResponses];
+
+export type GetV1ArtifactByNamespaceByNameTagByTagData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Tag pointing to the desired version.
+         */
+        tag: string;
+    };
+    query?: never;
+    url: '/v1/artifact/{namespace}/{name}/tag/{tag}';
+};
+
+export type GetV1ArtifactByNamespaceByNameTagByTagErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1ArtifactByNamespaceByNameTagByTagError = GetV1ArtifactByNamespaceByNameTagByTagErrors[keyof GetV1ArtifactByNamespaceByNameTagByTagErrors];
+
+export type GetV1ArtifactByNamespaceByNameTagByTagResponses = {
+    /**
+     * Artifact metadata.
+     */
+    200: Artifact;
+};
+
+export type GetV1ArtifactByNamespaceByNameTagByTagResponse = GetV1ArtifactByNamespaceByNameTagByTagResponses[keyof GetV1ArtifactByNamespaceByNameTagByTagResponses];
+
+export type PatchV1ArtifactByNamespaceByNameTagByTagData = {
+    body: PatchArtifact;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Tag pointing to the desired version.
+         */
+        tag: string;
+    };
+    query?: never;
+    url: '/v1/artifact/{namespace}/{name}/tag/{tag}';
+};
+
+export type PatchV1ArtifactByNamespaceByNameTagByTagErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type PatchV1ArtifactByNamespaceByNameTagByTagError = PatchV1ArtifactByNamespaceByNameTagByTagErrors[keyof PatchV1ArtifactByNamespaceByNameTagByTagErrors];
+
+export type PatchV1ArtifactByNamespaceByNameTagByTagResponses = {
+    /**
+     * Artifact metadata updated successfully.
+     */
+    200: Artifact;
+};
+
+export type PatchV1ArtifactByNamespaceByNameTagByTagResponse = PatchV1ArtifactByNamespaceByNameTagByTagResponses[keyof PatchV1ArtifactByNamespaceByNameTagByTagResponses];
+
+export type DeleteV1ArtifactByNamespaceByNameHashByHashData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Version hash of the artifact.
+         */
+        hash: string;
+    };
+    query?: never;
+    url: '/v1/artifact/{namespace}/{name}/hash/{hash}';
+};
+
+export type DeleteV1ArtifactByNamespaceByNameHashByHashErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type DeleteV1ArtifactByNamespaceByNameHashByHashError = DeleteV1ArtifactByNamespaceByNameHashByHashErrors[keyof DeleteV1ArtifactByNamespaceByNameHashByHashErrors];
+
+export type DeleteV1ArtifactByNamespaceByNameHashByHashResponses = {
+    /**
+     * Artifact deleted successfully.
+     */
+    200: Artifact;
+};
+
+export type DeleteV1ArtifactByNamespaceByNameHashByHashResponse = DeleteV1ArtifactByNamespaceByNameHashByHashResponses[keyof DeleteV1ArtifactByNamespaceByNameHashByHashResponses];
+
+export type GetV1ArtifactByNamespaceByNameHashByHashData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Version hash of the artifact.
+         */
+        hash: string;
+    };
+    query?: never;
+    url: '/v1/artifact/{namespace}/{name}/hash/{hash}';
+};
+
+export type GetV1ArtifactByNamespaceByNameHashByHashErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1ArtifactByNamespaceByNameHashByHashError = GetV1ArtifactByNamespaceByNameHashByHashErrors[keyof GetV1ArtifactByNamespaceByNameHashByHashErrors];
+
+export type GetV1ArtifactByNamespaceByNameHashByHashResponses = {
+    /**
+     * Artifact metadata.
+     */
+    200: Artifact;
+};
+
+export type GetV1ArtifactByNamespaceByNameHashByHashResponse = GetV1ArtifactByNamespaceByNameHashByHashResponses[keyof GetV1ArtifactByNamespaceByNameHashByHashResponses];
+
+export type PatchV1ArtifactByNamespaceByNameHashByHashData = {
+    body: PatchArtifact;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Version hash of the artifact.
+         */
+        hash: string;
+    };
+    query?: never;
+    url: '/v1/artifact/{namespace}/{name}/hash/{hash}';
+};
+
+export type PatchV1ArtifactByNamespaceByNameHashByHashErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type PatchV1ArtifactByNamespaceByNameHashByHashError = PatchV1ArtifactByNamespaceByNameHashByHashErrors[keyof PatchV1ArtifactByNamespaceByNameHashByHashErrors];
+
+export type PatchV1ArtifactByNamespaceByNameHashByHashResponses = {
+    /**
+     * Artifact metadata updated successfully.
+     */
+    200: Artifact;
+};
+
+export type PatchV1ArtifactByNamespaceByNameHashByHashResponse = PatchV1ArtifactByNamespaceByNameHashByHashResponses[keyof PatchV1ArtifactByNamespaceByNameHashByHashResponses];
+
+export type GetV1ArtifactRawByNamespaceByNameTagByTagData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Tag pointing to the desired version.
+         */
+        tag: string;
+    };
+    query?: never;
+    url: '/v1/artifact/raw/{namespace}/{name}/tag/{tag}';
+};
+
+export type GetV1ArtifactRawByNamespaceByNameTagByTagErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1ArtifactRawByNamespaceByNameTagByTagError = GetV1ArtifactRawByNamespaceByNameTagByTagErrors[keyof GetV1ArtifactRawByNamespaceByNameTagByTagErrors];
+
+export type GetV1ArtifactRawByNamespaceByNameTagByTagResponses = {
+    /**
+     * Artifact content.
+     */
+    200: Blob | File;
+};
+
+export type GetV1ArtifactRawByNamespaceByNameTagByTagResponse = GetV1ArtifactRawByNamespaceByNameTagByTagResponses[keyof GetV1ArtifactRawByNamespaceByNameTagByTagResponses];
+
+export type GetV1ArtifactRawByNamespaceByNameHashByHashData = {
+    body?: never;
+    path: {
+        /**
+         * Artifact namespace.
+         */
+        namespace: string;
+        /**
+         * Artifact name.
+         */
+        name: string;
+        /**
+         * Version hash of the artifact.
+         */
+        hash: string;
+    };
+    query?: never;
+    url: '/v1/artifact/raw/{namespace}/{name}/hash/{hash}';
+};
+
+export type GetV1ArtifactRawByNamespaceByNameHashByHashErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1ArtifactRawByNamespaceByNameHashByHashError = GetV1ArtifactRawByNamespaceByNameHashByHashErrors[keyof GetV1ArtifactRawByNamespaceByNameHashByHashErrors];
+
+export type GetV1ArtifactRawByNamespaceByNameHashByHashResponses = {
+    /**
+     * Artifact content.
+     */
+    200: Blob | File;
+};
+
+export type GetV1ArtifactRawByNamespaceByNameHashByHashResponse = GetV1ArtifactRawByNamespaceByNameHashByHashResponses[keyof GetV1ArtifactRawByNamespaceByNameHashByHashResponses];
+
+export type GetV1TaskData = {
     body?: never;
     path?: never;
-    query?: never;
-    url: '/tasks/list';
+    query?: {
+        /**
+         * Maximum number of tasks to return.
+         */
+        limit?: number;
+        /**
+         * Offset for pagination.
+         */
+        offset?: number;
+        /**
+         * Filter tasks by state (e.g., ACTIVE).
+         */
+        state?: string;
+    };
+    url: '/v1/task';
 };
 
-export type GetTasksListErrors = {
+export type GetV1TaskErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -1995,30 +2098,71 @@ export type GetTasksListErrors = {
     500: unknown;
 };
 
-export type GetTasksListError = GetTasksListErrors[keyof GetTasksListErrors];
+export type GetV1TaskError = GetV1TaskErrors[keyof GetV1TaskErrors];
 
-export type GetTasksListResponses = {
+export type GetV1TaskResponses = {
     /**
      * Successful response with task list.
      */
-    200: Array<TaskState>;
+    200: Array<Task>;
 };
 
-export type GetTasksListResponse = GetTasksListResponses[keyof GetTasksListResponses];
+export type GetV1TaskResponse = GetV1TaskResponses[keyof GetV1TaskResponses];
 
-export type GetTasksTaskData = {
-    body?: never;
+export type PostV1TaskData = {
+    body: CreateTaskRequest;
     path?: never;
-    query: {
+    query?: never;
+    url: '/v1/task';
+};
+
+export type PostV1TaskErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The request payload is too large.
+     */
+    413: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type PostV1TaskError = PostV1TaskErrors[keyof PostV1TaskErrors];
+
+export type PostV1TaskResponses = {
+    /**
+     * Task created successfully.
+     */
+    201: Task;
+};
+
+export type PostV1TaskResponse = PostV1TaskResponses[keyof PostV1TaskResponses];
+
+export type GetV1TaskByIdData = {
+    body?: never;
+    path: {
         /**
-         * The unique identifier for the task to retrieve.
+         * Unique identifier of the task to retrieve.
          */
         id: string;
     };
-    url: '/tasks/task';
+    query?: never;
+    url: '/v1/task/{id}';
 };
 
-export type GetTasksTaskErrors = {
+export type GetV1TaskByIdErrors = {
     /**
      * The request was malformed or invalid.
      */
@@ -2041,13 +2185,76 @@ export type GetTasksTaskErrors = {
     500: unknown;
 };
 
-export type GetTasksTaskError = GetTasksTaskErrors[keyof GetTasksTaskErrors];
+export type GetV1TaskByIdError = GetV1TaskByIdErrors[keyof GetV1TaskByIdErrors];
 
-export type GetTasksTaskResponses = {
+export type GetV1TaskByIdResponses = {
     /**
-     * Successful response with task information.
+     * Task details.
      */
-    200: TaskState;
+    200: Task;
 };
 
-export type GetTasksTaskResponse = GetTasksTaskResponses[keyof GetTasksTaskResponses];
+export type GetV1TaskByIdResponse = GetV1TaskByIdResponses[keyof GetV1TaskByIdResponses];
+
+export type GetV1TaskByIdLogsData = {
+    body?: never;
+    path: {
+        /**
+         * Unique identifier of the task to retrieve logs for.
+         */
+        id: string;
+    };
+    query?: {
+        /**
+         * Filter logs by level.
+         */
+        level?: string;
+        /**
+         * Filter logs by issuer.
+         */
+        issuer?: string;
+        /**
+         * Start of the time range filter. Must be used with time-range-to and be more recent.
+         */
+        'time-range-from'?: string;
+        /**
+         * End of the time range filter. Must be used with time-range-from and be less recent.
+         */
+        'time-range-to'?: string;
+    };
+    url: '/v1/task/{id}/logs';
+};
+
+export type GetV1TaskByIdLogsErrors = {
+    /**
+     * The request was malformed or invalid.
+     */
+    400: ErrGeneric;
+    /**
+     * The provided authentication credentials were invalid.
+     */
+    401: unknown;
+    /**
+     * The authenticated user does not have permission to access the requested resource.
+     */
+    403: unknown;
+    /**
+     * The requested resource was not found.
+     */
+    404: ErrGeneric;
+    /**
+     * An internal server error occurred. Look at the server logs for more details.
+     */
+    500: unknown;
+};
+
+export type GetV1TaskByIdLogsError = GetV1TaskByIdLogsErrors[keyof GetV1TaskByIdLogsErrors];
+
+export type GetV1TaskByIdLogsResponses = {
+    /**
+     * Task logs.
+     */
+    200: Array<TaskLog>;
+};
+
+export type GetV1TaskByIdLogsResponse = GetV1TaskByIdLogsResponses[keyof GetV1TaskByIdLogsResponses];

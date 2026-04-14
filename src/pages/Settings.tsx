@@ -27,7 +27,6 @@ import { useState, useEffect } from "react";
 export default function Settings() {
   const {
     user,
-    updateUsername,
     updateDisplayName,
     updatePassword,
     deleteAccount,
@@ -65,11 +64,6 @@ export default function Settings() {
     setIsLoading(true);
 
     try {
-      // Update username if it changed
-      if (name !== user?.name) {
-        await updateUsername(name);
-      }
-
       // Update display name if it changed
       if (displayName !== user?.displayName) {
         await updateDisplayName(displayName);
@@ -152,10 +146,12 @@ export default function Settings() {
                     <Input
                       id="name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Enter your username"
-                      className="w-full"
+                      readOnly
+                      disabled
+                      className="w-full opacity-60"
+                      title="Username cannot be changed"
                     />
+                    <p className="text-xs text-muted-foreground">Username cannot be changed.</p>
                   </div>
                   <div className="space-y-2 max-w-xs">
                     <Label htmlFor="displayName">Display Name</Label>

@@ -70,26 +70,23 @@ import {
 
 // API Client
 import {
-  getRbacListRoles,
-  postRbacRole,
-  deleteRbacRole,
-  getRbacRole,
-  getRbacListResourceGroups,
-  postRbacResourceGroup,
-  deleteRbacResourceGroup,
-  getRbacResourceGroup,
-  getUsersUser,
-  getRbacPolicy,
-  postRbacPolicy,
-  deleteRbacPolicy,
-  postRbacEndpoint,
+  getV1RbacRole,
+  putV1RbacRoleByRole,
+  deleteV1RbacRoleByRole,
+  getV1RbacRoleByRole,
+  getV1RbacResourceGroup,
+  putV1RbacResourceGroupByResourceGroup,
+  deleteV1RbacResourceGroupByResourceGroup,
+  getV1RbacResourceGroupByResourceGroup,
+  getV1UserByUsername,
+  getV1RbacPolicy,
+  putV1RbacPolicy,
+  deleteV1RbacPolicy,
 } from "../client";
 import { client } from "../client/client.gen";
 import type { RbacPolicy } from "../client";
 
-// ===== TYPES =====
 interface UserDetail {
-  id: string;
   name: string;
   displayName: string;
 }
@@ -98,14 +95,14 @@ interface Role {
   name: string;
   users?: UserDetail[];
   isLoading?: boolean;
-  hasUserAccess?: boolean; // Track if user can access user details
+  hasUserAccess?: boolean;
 }
 
 interface ResourceGroup {
   name: string;
   endpoints?: string[];
   isLoading?: boolean;
-  hasEndpointAccess?: boolean; // Track if user can access endpoint details
+  hasEndpointAccess?: boolean;
 }
 
 interface CreateRoleFormData {
@@ -117,7 +114,6 @@ interface CreateResourceGroupFormData {
   endpoints: string[];
 }
 
-// ===== CONSTANTS =====
 const EMPTY_ROLE_FORM: CreateRoleFormData = {
   name: "",
 };
@@ -127,16 +123,12 @@ const EMPTY_RESOURCE_GROUP_FORM: CreateResourceGroupFormData = {
   endpoints: [],
 };
 
-// ===== UTILITY FUNCTIONS =====
-/**
- * Configure the API client with stored authentication credentials
- */
 function configureClient(): void {
   const storedCredentials = localStorage.getItem("enclave_credentials");
   if (storedCredentials) {
     try {
       client.setConfig({
-        baseUrl: "/api", // Using nginx reverse proxy
+        baseUrl: "/api",
         headers: {
           Authorization: `Basic ${storedCredentials}`,
         },
@@ -149,17 +141,12 @@ function configureClient(): void {
   }
 }
 
-/**
- * Handle API errors consistently
- */
 function handleApiError(error: unknown, defaultMessage: string): void {
   const err = error as { body?: { error?: string } };
   toast.error(err.body?.error || defaultMessage);
 }
 
-// ===== MAIN COMPONENT =====
 export default function RoleManagement() {
-  // ===== STATE =====
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [hasAccess, setHasAccess] = useState(true);
@@ -190,65 +177,58 @@ export default function RoleManagement() {
   const [createPolicyFormData, setCreatePolicyFormData] = useState({
     role: "",
     resourceGroup: "",
-    permission: "*",
+    method: "*",
   });
+
   // Function to discover endpoints from OpenAPI specification
   const discoverEndpoints = useCallback(async () => {
     try {
       setEndpointsLoading(true);
-      // Fetch the OpenAPI specification
       const response = await fetch('/openapi.yml');
       if (!response.ok) {
         throw new Error('Failed to fetch OpenAPI specification');
       }
-      
+
       const yamlText = await response.text();
-      
-      // Simple YAML parsing for paths section
-      // This is a basic parser focused on extracting endpoint paths
+
       const pathsMatch = yamlText.match(/^paths:\s*([\s\S]*?)^(?:\w|$)/m);
       if (!pathsMatch) {
         throw new Error('No paths section found in OpenAPI spec');
       }
-      
+
       const pathsSection = pathsMatch[1];
       const endpointMatches = pathsSection.match(/^\s{2}(\/[^:]+):/gm);
-      
+
       if (endpointMatches) {
         const endpoints = endpointMatches
           .map(match => match.trim().replace(':', ''))
           .filter(endpoint => endpoint.startsWith('/'))
           .sort();
-        
+
         setDiscoveredEndpoints(endpoints);
       } else {
         setDiscoveredEndpoints([]);
       }
     } catch (error) {
       console.error('Error discovering endpoints:', error);
-      // Fallback to common endpoints if auto-discovery fails
       setDiscoveredEndpoints([
-        '/users/user',
-        '/users/list',
-        '/artifacts/list',
-        '/artifacts/artifact',
-        '/tasks/list',
-        '/tasks/task',
-        '/rbac/roles',
-        '/rbac/policies',
-        '/rbac/resource-groups'
+        '/v1/user',
+        '/v1/artifact',
+        '/v1/task',
+        '/v1/rbac/role',
+        '/v1/rbac/policy',
+        '/v1/rbac/resource-group',
       ]);
     } finally {
       setEndpointsLoading(false);
     }
   }, []);
 
-  // ===== POLICIES =====
   const loadPolicies = useCallback(async () => {
     try {
       configureClient();
       setPolicyLoading(true);
-      const response = await getRbacPolicy();
+      const response = await getV1RbacPolicy();
       if (response.data && Array.isArray(response.data)) {
         setPolicies(response.data);
       } else {
@@ -263,24 +243,24 @@ export default function RoleManagement() {
   }, []);
 
   const handleCreatePolicy = async () => {
-    const { role, resourceGroup, permission } = createPolicyFormData;
-    if (!role || !resourceGroup || !permission) {
+    const { role, resourceGroup, method } = createPolicyFormData;
+    if (!role || !resourceGroup || !method) {
       toast.error("Please fill all fields");
       return;
     }
     try {
       setPolicyLoading(true);
       configureClient();
-      await postRbacPolicy({
+      await putV1RbacPolicy({
         body: {
           role,
           resourceGroup,
-          permission: permission as RbacPolicy["permission"],
+          method: method as RbacPolicy["method"],
         },
       });
       toast.success("Policy created successfully");
       setCreatePolicyDialogOpen(false);
-      setCreatePolicyFormData({ role: "", resourceGroup: "", permission: "*" });
+      setCreatePolicyFormData({ role: "", resourceGroup: "", method: "*" });
       loadPolicies();
     } catch (error) {
       handleApiError(error, "Failed to create policy");
@@ -293,7 +273,7 @@ export default function RoleManagement() {
     try {
       setPolicyLoading(true);
       configureClient();
-      await deleteRbacPolicy({ body: policy });
+      await deleteV1RbacPolicy({ body: policy });
       toast.success("Policy deleted successfully");
       loadPolicies();
     } catch (error) {
@@ -303,26 +283,25 @@ export default function RoleManagement() {
     }
   };
 
-  // ===== DATA LOADING =====
   const loadRoles = useCallback(async () => {
     try {
       configureClient();
-      const rolesResponse = await getRbacListRoles();
+      const rolesResponse = await getV1RbacRole();
       if (!rolesResponse.response.ok) {
         setHasAccess(false);
       }
       if (rolesResponse.data && Array.isArray(rolesResponse.data)) {
-        // API returns Array<string>, so map directly to role objects
-        const rolesData = rolesResponse.data.map((roleName) => ({
-          name: String(roleName),
+        // API returns Array<RoleResource> with {name, users: string[]}
+        const rolesData = rolesResponse.data.map((roleResource) => ({
+          name: roleResource.name,
           users: [],
           isLoading: true,
           hasUserAccess: true,
         }));
         setRoles(rolesData);
 
-        rolesResponse.data.forEach((roleName) => {
-          loadRoleUsers(String(roleName));
+        rolesResponse.data.forEach((roleResource) => {
+          loadRoleUsers(roleResource.name);
         });
       } else {
         setRoles([]);
@@ -348,21 +327,20 @@ export default function RoleManagement() {
   const loadResourceGroups = useCallback(async () => {
     try {
       configureClient();
-      const groupsResponse = await getRbacListResourceGroups();
+      const groupsResponse = await getV1RbacResourceGroup();
 
       if (groupsResponse.data && Array.isArray(groupsResponse.data)) {
-        // API returns Array<string>, so map directly to group objects
-        const groupsData = groupsResponse.data.map((groupName) => ({
-          name: String(groupName),
+        // API returns Array<ResourceGroupResource> with {name, endpoints: string[]}
+        const groupsData = groupsResponse.data.map((groupResource) => ({
+          name: groupResource.name,
           endpoints: [],
           isLoading: true,
           hasEndpointAccess: true,
         }));
         setResourceGroups(groupsData);
 
-        // Load endpoints for each group immediately
-        groupsResponse.data.forEach((groupName) => {
-          loadGroupEndpoints(String(groupName));
+        groupsResponse.data.forEach((groupResource) => {
+          loadGroupEndpoints(groupResource.name);
         });
       } else {
         setResourceGroups([]);
@@ -373,7 +351,7 @@ export default function RoleManagement() {
 
       if (status === 403) {
         setResourceGroups([]);
-        throw error; // Let the parent handle access denial
+        throw error;
       } else if (status === 401) {
         toast.error("Authentication required");
         window.location.assign("/login");
@@ -413,9 +391,8 @@ export default function RoleManagement() {
     loadData();
     loadPolicies();
     discoverEndpoints();
-  }, [loadData, discoverEndpoints]);
+  }, [loadData, discoverEndpoints, loadPolicies]);
 
-  // ===== ROLE MANAGEMENT ACTIONS =====
   const handleCreateRole = async () => {
     const { name } = createRoleFormData;
 
@@ -428,8 +405,9 @@ export default function RoleManagement() {
       setRoleLoading(true);
       configureClient();
 
-      await postRbacRole({
-        body: { role: name },
+      await putV1RbacRoleByRole({
+        path: { role: name },
+        body: { users: [] },
       });
 
       toast.success("Role created successfully");
@@ -445,7 +423,7 @@ export default function RoleManagement() {
   const handleDeleteRole = async (roleName: string) => {
     try {
       configureClient();
-      await deleteRbacRole({ body: { role: roleName } });
+      await deleteV1RbacRoleByRole({ path: { role: roleName } });
       toast.success(`Role "${roleName}" deleted successfully`);
       loadRoles();
     } catch (error: unknown) {
@@ -453,7 +431,6 @@ export default function RoleManagement() {
     }
   };
 
-  // ===== RESOURCE GROUP MANAGEMENT ACTIONS =====
   const handleCreateResourceGroup = async () => {
     const { name, endpoints } = createGroupFormData;
 
@@ -466,24 +443,10 @@ export default function RoleManagement() {
       setGroupLoading(true);
       configureClient();
 
-      // Create the resource group first
-      await postRbacResourceGroup({
-        body: { resourceGroup: name },
+      await putV1RbacResourceGroupByResourceGroup({
+        path: { resourceGroup: name },
+        body: { endpoints },
       });
-
-      // Assign each selected endpoint to the resource group
-      if (endpoints.length > 0) {
-        await Promise.all(
-          endpoints.map((endpoint) =>
-            postRbacEndpoint({
-              body: {
-                resourceGroup: name,
-                endpoint,
-              },
-            })
-          )
-        );
-      }
 
       toast.success(`Resource group created successfully${endpoints.length > 0 ? ` with ${endpoints.length} endpoint(s)` : ''}`);
       resetGroupForm();
@@ -498,7 +461,7 @@ export default function RoleManagement() {
   const handleDeleteResourceGroup = async (groupName: string) => {
     try {
       configureClient();
-      await deleteRbacResourceGroup({ body: { resourceGroup: groupName } });
+      await deleteV1RbacResourceGroupByResourceGroup({ path: { resourceGroup: groupName } });
       toast.success(`Resource group "${groupName}" deleted successfully`);
       loadResourceGroups();
     } catch (error: unknown) {
@@ -506,38 +469,32 @@ export default function RoleManagement() {
     }
   };
 
-  // ===== DETAIL LOADING =====
   const loadRoleUsers = async (roleName: string) => {
     try {
       configureClient();
-      const response = await getRbacRole({ query: { role: roleName } });
+      const response = await getV1RbacRoleByRole({ path: { role: roleName } });
 
-      // Check if we got a valid response with expected data format
-      if (
-        response.data &&
-        Array.isArray(response.data) &&
-        response.response.ok
-      ) {
-        // Fetch user details for each user ID
-        const userPromises = response.data.map(async (userId: string) => {
+      if (response.data && response.response.ok) {
+        // RoleResource has {name, users: string[]} where users are usernames
+        const usernames = response.data.users ?? [];
+
+        // Fetch user details for each username
+        const userPromises = usernames.map(async (username: string) => {
           try {
-            const userResponse = await getUsersUser({ query: { userId } });
+            const userResponse = await getV1UserByUsername({ path: { username } });
             if (!userResponse.response.ok) {
               throw new Error("Failed to fetch user details");
             }
             return userResponse.data as UserDetail;
           } catch {
-            // If we can't get display name, return null to indicate failure
             return null;
           }
         });
 
-        // Await all user detail promises, throwing if any fail
         let userDetailsResults: (UserDetail | null)[];
         try {
           userDetailsResults = await Promise.all(userPromises);
         } catch {
-          // If any promise rejects, treat as access denied for this role
           throw new Error("Failed to resolve user details");
         }
 
@@ -545,12 +502,10 @@ export default function RoleManagement() {
           (user): user is UserDetail => user !== null
         );
 
-        // Check if we got all user details or if some failed
         const hasUserDetailAccess =
-          userDetailsResults.length > 0 &&
+          userDetailsResults.length === 0 ||
           userDetailsResults.every((user) => user !== null);
 
-        // Update the role with user details and remove loading state
         setRoles((prev) =>
           prev.map((role) =>
             role.name === roleName
@@ -564,11 +519,9 @@ export default function RoleManagement() {
           )
         );
       } else {
-        // Invalid response format - show "-"
         throw new Error("Invalid response format from API");
       }
     } catch {
-      // Any error (403, 401, network, invalid response, etc.) should show "-"
       setRoles((prev) =>
         prev.map((role) =>
           role.name === roleName
@@ -582,23 +535,18 @@ export default function RoleManagement() {
   const loadGroupEndpoints = async (groupName: string) => {
     try {
       configureClient();
-      const response = await getRbacResourceGroup({
-        query: { resourceGroup: groupName },
+      const response = await getV1RbacResourceGroupByResourceGroup({
+        path: { resourceGroup: groupName },
       });
 
-      // Check if we got a valid response with expected data format
-      if (
-        response.data &&
-        Array.isArray(response.data) &&
-        response.response.ok
-      ) {
-        // Update the group with endpoints and remove loading state
+      if (response.data && response.response.ok) {
+        // ResourceGroupResource has {name, endpoints: string[]}
         setResourceGroups((prev) =>
           prev.map((group) =>
             group.name === groupName
               ? {
                   ...group,
-                  endpoints: response.data as string[],
+                  endpoints: response.data!.endpoints,
                   isLoading: false,
                   hasEndpointAccess: true,
                 }
@@ -606,11 +554,9 @@ export default function RoleManagement() {
           )
         );
       } else {
-        // Invalid response format - show "-"
         throw new Error("Invalid response format from API");
       }
     } catch {
-      // Any error (403, 401, network, invalid response, etc.) should show "-"
       setResourceGroups((prev) =>
         prev.map((group) =>
           group.name === groupName
@@ -626,7 +572,6 @@ export default function RoleManagement() {
     }
   };
 
-  // ===== COMPUTED VALUES =====
   const filteredRoles = roles.filter((role) => {
     const searchLower = searchTerm.toLowerCase();
     return role.name.toLowerCase().includes(searchLower);
@@ -648,7 +593,7 @@ export default function RoleManagement() {
     return (
       policy.role.toLowerCase().includes(searchLower) ||
       policy.resourceGroup.toLowerCase().includes(searchLower) ||
-      policy.permission.toLowerCase().includes(searchLower)
+      policy.method.toLowerCase().includes(searchLower)
     );
   });
 
@@ -657,9 +602,8 @@ export default function RoleManagement() {
     try {
       setPolicyLoading(true);
       configureClient();
-      // Remove old policy, then add new one
-      await deleteRbacPolicy({ body: editPolicyFormData });
-      await postRbacPolicy({ body: editPolicyFormData });
+      await deleteV1RbacPolicy({ body: editPolicyFormData });
+      await putV1RbacPolicy({ body: editPolicyFormData });
       toast.success("Policy updated successfully");
       setEditPolicyDialogOpen(false);
       setEditPolicyFormData(null);
@@ -676,7 +620,6 @@ export default function RoleManagement() {
     return group.name.toLowerCase().includes(searchLower);
   });
 
-  // ===== RENDER HELPERS =====
   const resetRoleForm = () => {
     setCreateRoleFormData(EMPTY_ROLE_FORM);
     setCreateRoleDialogOpen(false);
@@ -687,7 +630,6 @@ export default function RoleManagement() {
     setCreateGroupDialogOpen(false);
   };
 
-  // ===== LOADING STATE =====
   if (loading) {
     return (
       <PageLayout title="Role & Group Management">
@@ -700,8 +642,7 @@ export default function RoleManagement() {
       </PageLayout>
     );
   }
-
-  // ===== ACCESS DENIED STATE =====
+// Access Denied state
   if (!hasAccess && !loading) {
     return (
       <PageLayout title="Role & Group Management">
@@ -728,7 +669,6 @@ export default function RoleManagement() {
     );
   }
 
-  // ===== MAIN RENDER =====
   return (
     <PageLayout title="Role & Group Management">
       <div className="space-y-6">
@@ -772,7 +712,7 @@ export default function RoleManagement() {
         <Tabs
           value={activeTab}
           onValueChange={(value: string) =>
-            setActiveTab(value as "roles" | "groups")
+            setActiveTab(value as "roles" | "groups" | "policies")
           }
         >
           <TabsList className="grid w-full grid-cols-3">
@@ -898,9 +838,7 @@ export default function RoleManagement() {
                                           <IconUsers className="h-3 w-3 mr-1" />
                                           {role.isLoading
                                             ? "Loading..."
-                                            : `${
-                                                role.users?.length || 0
-                                              } users`}
+                                            : `${role.users?.length || 0} users`}
                                         </Badge>
                                       </TooltipTrigger>
                                     </PopoverTrigger>
@@ -913,12 +851,11 @@ export default function RoleManagement() {
                                           <p className="text-sm text-muted-foreground">
                                             Loading users...
                                           </p>
-                                        ) : role.users &&
-                                          role.users.length > 0 ? (
+                                        ) : role.users && role.users.length > 0 ? (
                                           <div className="max-h-40 overflow-y-auto">
                                             {role.users.map((user, idx) => (
                                               <div
-                                                key={user.id || idx}
+                                                key={user.name || idx}
                                                 className="text-sm py-2 px-3 bg-muted rounded mb-1 border"
                                               >
                                                 <div className="font-medium text-foreground">
@@ -969,9 +906,7 @@ export default function RoleManagement() {
                                       Cancel
                                     </AlertDialogCancel>
                                     <AlertDialogAction
-                                      onClick={() =>
-                                        handleDeleteRole(role.name)
-                                      }
+                                      onClick={() => handleDeleteRole(role.name)}
                                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     >
                                       Delete Role
@@ -990,7 +925,6 @@ export default function RoleManagement() {
             </Card>
           </TabsContent>
 
-          {/* Resource Groups Tab */}
           {/* Policies Tab */}
           <TabsContent value="policies" className="space-y-4">
             <div className="flex items-center justify-between">
@@ -1070,25 +1004,26 @@ export default function RoleManagement() {
                       </Select>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="policy-permission" className="text-right">
-                        Permission *
+                      <Label htmlFor="policy-method" className="text-right">
+                        Method *
                       </Label>
                       <Select
-                        value={createPolicyFormData.permission}
+                        value={createPolicyFormData.method}
                         onValueChange={(value) =>
                           setCreatePolicyFormData((prev) => ({
                             ...prev,
-                            permission: value as RbacPolicy["permission"],
+                            method: value as RbacPolicy["method"],
                           }))
                         }
                       >
                         <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select permission" />
+                          <SelectValue placeholder="Select method" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="*">*</SelectItem>
                           <SelectItem value="GET">GET</SelectItem>
                           <SelectItem value="POST">POST</SelectItem>
+                          <SelectItem value="PUT">PUT</SelectItem>
                           <SelectItem value="PATCH">PATCH</SelectItem>
                           <SelectItem value="DELETE">DELETE</SelectItem>
                           <SelectItem value="HEAD">HEAD</SelectItem>
@@ -1133,7 +1068,7 @@ export default function RoleManagement() {
                       <TableRow>
                         <TableHead>Role</TableHead>
                         <TableHead>Resource Group</TableHead>
-                        <TableHead>Permission</TableHead>
+                        <TableHead>Method</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1143,12 +1078,12 @@ export default function RoleManagement() {
                           key={
                             policy.role +
                             policy.resourceGroup +
-                            policy.permission
+                            policy.method
                           }
                         >
                           <TableCell>{policy.role}</TableCell>
                           <TableCell>{policy.resourceGroup}</TableCell>
-                          <TableCell>{policy.permission}</TableCell>
+                          <TableCell>{policy.method}</TableCell>
                           <TableCell className="flex gap-2">
                             <Button
                               variant="outline"
@@ -1178,7 +1113,7 @@ export default function RoleManagement() {
                           <DialogHeader>
                             <DialogTitle>Edit Policy</DialogTitle>
                             <DialogDescription>
-                              Modify the role, resource group, or permission for
+                              Modify the role, resource group, or method for
                               this policy.
                             </DialogDescription>
                           </DialogHeader>
@@ -1248,36 +1183,34 @@ export default function RoleManagement() {
                               </div>
                               <div className="grid grid-cols-4 items-center gap-4">
                                 <Label
-                                  htmlFor="edit-policy-permission"
+                                  htmlFor="edit-policy-method"
                                   className="text-right"
                                 >
-                                  Permission *
+                                  Method *
                                 </Label>
                                 <Select
-                                  value={editPolicyFormData.permission}
+                                  value={editPolicyFormData.method}
                                   onValueChange={(value) =>
                                     setEditPolicyFormData((prev) =>
                                       prev
                                         ? {
                                             ...prev,
-                                            permission:
-                                              value as RbacPolicy["permission"],
+                                            method: value as RbacPolicy["method"],
                                           }
                                         : prev
                                     )
                                   }
                                 >
                                   <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="Select permission" />
+                                    <SelectValue placeholder="Select method" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="*">*</SelectItem>
                                     <SelectItem value="GET">GET</SelectItem>
                                     <SelectItem value="POST">POST</SelectItem>
+                                    <SelectItem value="PUT">PUT</SelectItem>
                                     <SelectItem value="PATCH">PATCH</SelectItem>
-                                    <SelectItem value="DELETE">
-                                      DELETE
-                                    </SelectItem>
+                                    <SelectItem value="DELETE">DELETE</SelectItem>
                                     <SelectItem value="HEAD">HEAD</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -1306,6 +1239,8 @@ export default function RoleManagement() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Resource Groups Tab */}
           <TabsContent value="groups" className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
@@ -1351,19 +1286,17 @@ export default function RoleManagement() {
                         placeholder="Enter group name"
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-4 items-start gap-4">
                       <Label htmlFor="group-endpoints" className="text-right pt-2">
                         Endpoints
                       </Label>
                       <div className="col-span-3 space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          Select from available API endpoints to assign to this resource group (auto-discovered from OpenAPI specification)
+                          Select from available API endpoints (auto-discovered from OpenAPI specification)
                         </p>
-                        
-                        {/* Available endpoints from OpenAPI specification */}
+
                         {(() => {
-                          // Combine discovered endpoints with any existing ones from resource groups
                           const existingEndpoints = new Set<string>();
                           resourceGroups.forEach((group) => {
                             if (group.endpoints && group.hasEndpointAccess) {
@@ -1372,13 +1305,12 @@ export default function RoleManagement() {
                               });
                             }
                           });
-                          
-                          // Merge discovered endpoints with existing ones, prioritizing discovered ones
+
                           const allAvailableEndpoints = [...new Set([
                             ...discoveredEndpoints,
-                            ...Array.from(existingEndpoints)
+                            ...Array.from(existingEndpoints),
                           ])].sort();
-                          
+
                           return endpointsLoading ? (
                             <div className="text-sm text-muted-foreground p-2 border rounded flex items-center gap-2">
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
@@ -1421,12 +1353,11 @@ export default function RoleManagement() {
                             </Select>
                           ) : (
                             <div className="text-sm text-muted-foreground p-2 border rounded">
-                              No endpoints available. There may be an issue loading the API specification.
+                              No endpoints available.
                             </div>
                           );
                         })()}
-                        
-                        {/* Selected endpoints */}
+
                         {createGroupFormData.endpoints.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-sm font-medium">Selected endpoints:</p>
@@ -1523,9 +1454,7 @@ export default function RoleManagement() {
                                           <IconDatabase className="h-3 w-3 mr-1" />
                                           {group.isLoading
                                             ? "Loading..."
-                                            : `${
-                                                group.endpoints?.length || 0
-                                              } endpoints`}
+                                            : `${group.endpoints?.length || 0} endpoints`}
                                         </Badge>
                                       </TooltipTrigger>
                                     </PopoverTrigger>
@@ -1538,8 +1467,7 @@ export default function RoleManagement() {
                                           <p className="text-sm text-muted-foreground">
                                             Loading endpoints...
                                           </p>
-                                        ) : group.endpoints &&
-                                          group.endpoints.length > 0 ? (
+                                        ) : group.endpoints && group.endpoints.length > 0 ? (
                                           <div className="max-h-40 overflow-y-auto">
                                             {group.endpoints.map((endpoint) => (
                                               <div

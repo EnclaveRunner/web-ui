@@ -16,7 +16,7 @@ const Login = lazy(() => import("../pages/Login"));
 const UserManagement = lazy(() => import("../pages/UserManagement"));
 const RoleManagement = lazy(() => import("../pages/RoleManagement"));
 const Artifacts = lazy(() => import("../pages/Artifacts"));
-const Blueprint = lazy(() => import("../pages/Blueprint"));
+const Task = lazy(() => import("../pages/Task"));
 const TaskOverview = lazy(() => import("../pages/TaskOverview"));
 
 export interface AppRoute {
@@ -91,8 +91,8 @@ export const appRoutes: AppRoute[] = [
     order: 1,
   },
   {
-    path: "/blueprint/:artifactId",
-    component: Blueprint,
+    path: "/task/new/:artifactId",
+    component: Task,
     protected: true,
     // No navigation properties - this is a detail page
   },

@@ -64,21 +64,14 @@ import {
 
 // API Client
 import {
-  getUsersList,
-  postUsersUser,
-  deleteUsersUser,
-  getRbacListRoles,
-  postRbacUser,
-  deleteRbacUser,
-  getRbacUser,
+  getV1User,
+  putV1UserByUsername,
+  deleteV1UserByUsername,
+  getV1RbacRole,
+  patchV1UserByUsername,
 } from "../client";
 import { client } from "../client/client.gen";
 import type { UserResponse } from "../client/types.gen";
-
-// ===== TYPES =====
-interface User extends UserResponse {
-  roles: string[];
-}
 
 interface CreateUserFormData {
   name: string;
@@ -86,14 +79,12 @@ interface CreateUserFormData {
   password: string;
 }
 
-// ===== CONSTANTS =====
 const EMPTY_CREATE_FORM: CreateUserFormData = {
   name: "",
   displayName: "",
   password: "",
 };
 
-// ===== UTILITY FUNCTIONS =====
 /**
  * Configure the API client with stored authentication credentials
  */
@@ -114,22 +105,6 @@ function configureClient(): void {
 }
 
 /**
- * Parse role data from API response into a clean array of role names
- */
-function parseRoles(roleData: unknown[]): string[] {
-  return roleData.map((role) => {
-    if (typeof role === "string") return role;
-    if (role && typeof role === "object" && "name" in role) {
-      return (role as { name: string }).name;
-    }
-    if (role && typeof role === "object" && "role" in role) {
-      return (role as { role: string }).role;
-    }
-    return String(role);
-  });
-}
-
-/**
  * Handle API errors consistently
  */
 function handleApiError(error: unknown, defaultMessage: string): void {
@@ -137,11 +112,8 @@ function handleApiError(error: unknown, defaultMessage: string): void {
   toast.error(err.body?.error || defaultMessage);
 }
 
-// ===== MAIN COMPONENT =====
 export default function UserManagement() {
-  // ===== STATE =====
-  // User data and UI state
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [hasAccess, setHasAccess] = useState(true);
@@ -154,19 +126,18 @@ export default function UserManagement() {
 
   // Role management dialog state
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [selectedRole, setSelectedRole] = useState("");
   const [roleLoading, setRoleLoading] = useState(false);
 
-  // ===== DATA LOADING =====
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       setHasAccess(true);
       configureClient();
 
-      const usersResponse = await getUsersList();
+      const usersResponse = await getV1User();
 
       if (!usersResponse.data || !Array.isArray(usersResponse.data)) {
         setUsers([]);
@@ -174,28 +145,7 @@ export default function UserManagement() {
         return;
       }
 
-      // Fetch roles for each user
-      const usersWithRoles = await Promise.all(
-        usersResponse.data.map(async (user: UserResponse): Promise<User> => {
-          try {
-            const userRolesResponse = await getRbacUser({
-              query: { userId: user.id },
-            });
-
-            const roles =
-              userRolesResponse.data && Array.isArray(userRolesResponse.data)
-                ? parseRoles(userRolesResponse.data)
-                : [];
-
-            return { ...user, roles };
-          } catch (error) {
-            console.warn(`Failed to get roles for user ${user.name}:`, error);
-            return { ...user, roles: [] };
-          }
-        })
-      );
-
-      setUsers(usersWithRoles);
+      setUsers(usersResponse.data);
     } catch (error: unknown) {
       const err = error as { status?: number; response?: { status?: number } };
       const status = err.status || err.response?.status;
@@ -219,11 +169,11 @@ export default function UserManagement() {
   const loadAvailableRoles = useCallback(async () => {
     try {
       configureClient();
-      const rolesResponse = await getRbacListRoles();
+      const rolesResponse = await getV1RbacRole();
 
       const roleNames =
         rolesResponse.data && Array.isArray(rolesResponse.data)
-          ? parseRoles(rolesResponse.data)
+          ? rolesResponse.data.map((r) => r.name)
           : [];
 
       setAvailableRoles(roleNames);
@@ -238,7 +188,6 @@ export default function UserManagement() {
     loadUsers();
   }, [loadUsers]);
 
-  // ===== USER MANAGEMENT ACTIONS =====
   const handleCreateUser = async () => {
     const { name, displayName, password } = createFormData;
 
@@ -251,8 +200,9 @@ export default function UserManagement() {
       setCreateLoading(true);
       configureClient();
 
-      await postUsersUser({
-        body: { name, displayName, password },
+      await putV1UserByUsername({
+        path: { username: name },
+        body: { displayName, password },
       });
 
       toast.success("User created successfully");
@@ -265,47 +215,25 @@ export default function UserManagement() {
     }
   };
 
-  const handleDeleteUser = async (userId: string, userName: string) => {
+  const handleDeleteUser = async (username: string) => {
     try {
       configureClient();
-      await deleteUsersUser({ body: { id: userId } });
-      toast.success(`User ${userName} deleted successfully`);
+      await deleteV1UserByUsername({ path: { username } });
+      toast.success(`User ${username} deleted successfully`);
       loadUsers();
     } catch (error: unknown) {
       handleApiError(error, "Failed to delete user");
     }
   };
 
-  // ===== ROLE MANAGEMENT =====
-  const handleManageRoles = async (userId: string) => {
-    const user = users.find((u) => u.id === userId);
+  const handleManageRoles = async (username: string) => {
+    const user = users.find((u) => u.name === username);
     if (!user) return;
 
     setSelectedUser(user);
     setRoleDialogOpen(true);
 
-    await Promise.all([loadAvailableRoles(), fetchUserRoles(userId)]);
-  };
-
-  const fetchUserRoles = async (userId: string) => {
-    try {
-      configureClient();
-      const userRolesResponse = await getRbacUser({
-        query: { userId },
-      });
-
-      if (userRolesResponse.data && Array.isArray(userRolesResponse.data)) {
-        const roles = parseRoles(userRolesResponse.data);
-
-        // Update both selected user and users list
-        setSelectedUser((prev) => (prev ? { ...prev, roles } : null));
-        setUsers((prev) =>
-          prev.map((user) => (user.id === userId ? { ...user, roles } : user))
-        );
-      }
-    } catch (error) {
-      console.warn(`Failed to fetch roles for user ${userId}:`, error);
-    }
+    await loadAvailableRoles();
   };
 
   const handleAddRole = async () => {
@@ -314,7 +242,9 @@ export default function UserManagement() {
       return;
     }
 
-    if (selectedUser.roles.includes(selectedRole)) {
+    const currentRoles = selectedUser.roles ?? [];
+
+    if (currentRoles.includes(selectedRole)) {
       toast.error("User already has this role");
       return;
     }
@@ -323,22 +253,19 @@ export default function UserManagement() {
       setRoleLoading(true);
       configureClient();
 
-      await postRbacUser({
-        body: { userId: selectedUser.id, role: selectedRole },
+      const newRoles = [...currentRoles, selectedRole];
+      await patchV1UserByUsername({
+        path: { username: selectedUser.name },
+        body: { roles: newRoles },
       });
 
-      // Update roles in state immediately
-      const newRoles = [...selectedUser.roles, selectedRole];
-      setSelectedUser((prev) => (prev ? { ...prev, roles: newRoles } : null));
+      const updatedUser = { ...selectedUser, roles: newRoles };
+      setSelectedUser(updatedUser);
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === selectedUser.id ? { ...user, roles: newRoles } : user
-        )
+        prev.map((u) => (u.name === selectedUser.name ? updatedUser : u))
       );
 
-      toast.success(
-        `Role "${selectedRole}" added to user ${selectedUser.name}`
-      );
+      toast.success(`Role "${selectedRole}" added to user ${selectedUser.name}`);
       setSelectedRole("");
     } catch (error: unknown) {
       handleApiError(error, "Failed to add role");
@@ -354,24 +281,21 @@ export default function UserManagement() {
       setRoleLoading(true);
       configureClient();
 
-      await deleteRbacUser({
-        body: { userId: selectedUser.id, role: roleToRemove },
-      });
-
-      // Update roles in state immediately
-      const newRoles = selectedUser.roles.filter(
+      const newRoles = (selectedUser.roles ?? []).filter(
         (role) => role !== roleToRemove
       );
-      setSelectedUser((prev) => (prev ? { ...prev, roles: newRoles } : null));
+      await patchV1UserByUsername({
+        path: { username: selectedUser.name },
+        body: { roles: newRoles },
+      });
+
+      const updatedUser = { ...selectedUser, roles: newRoles };
+      setSelectedUser(updatedUser);
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === selectedUser.id ? { ...user, roles: newRoles } : user
-        )
+        prev.map((u) => (u.name === selectedUser.name ? updatedUser : u))
       );
 
-      toast.success(
-        `Role "${roleToRemove}" removed from user ${selectedUser.name}`
-      );
+      toast.success(`Role "${roleToRemove}" removed from user ${selectedUser.name}`);
     } catch (error: unknown) {
       handleApiError(error, "Failed to remove role");
     } finally {
@@ -379,7 +303,6 @@ export default function UserManagement() {
     }
   };
 
-  // ===== COMPUTED VALUES =====
   const filteredUsers = users.filter((user) => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -389,10 +312,9 @@ export default function UserManagement() {
   });
 
   const availableRolesForUser = availableRoles.filter(
-    (role) => !selectedUser?.roles.includes(role)
+    (role) => !(selectedUser?.roles ?? []).includes(role)
   );
 
-  // ===== RENDER HELPERS =====
   const resetCreateForm = () => {
     setCreateFormData(EMPTY_CREATE_FORM);
     setCreateDialogOpen(false);
@@ -671,7 +593,7 @@ export default function UserManagement() {
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
+                    <TableRow key={user.name}>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.displayName}</TableCell>
                       <TableCell>
@@ -696,7 +618,7 @@ export default function UserManagement() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleManageRoles(user.id)}
+                            onClick={() => handleManageRoles(user.name)}
                           >
                             <IconEdit className="h-3 w-3 mr-1" />
                             Manage
@@ -722,9 +644,7 @@ export default function UserManagement() {
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
-                                  onClick={() =>
-                                    handleDeleteUser(user.id, user.name)
-                                  }
+                                  onClick={() => handleDeleteUser(user.name)}
                                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                 >
                                   Delete User

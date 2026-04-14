@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
-// UI Components
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,15 +54,18 @@ import {
 } from "@tabler/icons-react";
 
 // API Client
-import { getArtifactList, deleteArtifact, postArtifactUpload } from "../client";
+import {
+  getV1Artifact,
+  deleteV1ArtifactByNamespaceByNameHashByHash,
+  postV1ArtifactRawByNamespaceByName,
+  patchV1ArtifactByNamespaceByNameHashByHash,
+} from "../client";
 import { client } from "../client/client.gen";
 import type { Artifact } from "../client";
 
 export default function Artifacts() {
-  // ===== HOOKS =====
   const navigate = useNavigate();
 
-  // ===== STATE =====
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -78,10 +80,8 @@ export default function Artifacts() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ===== PAGINATION CONSTANTS =====
   const ITEMS_PER_PAGE = 6;
 
-  // ===== CONFIGURE CLIENT =====
   const configureClient = () => {
     const storedCredentials = localStorage.getItem("enclave_credentials");
     if (storedCredentials) {
@@ -102,7 +102,6 @@ export default function Artifacts() {
     }
   };
 
-  // ===== LOAD ARTIFACTS =====
   const loadArtifacts = useCallback(async () => {
     try {
       setLoading(true);
@@ -118,7 +117,7 @@ export default function Artifacts() {
 
       configureClient();
       
-      const response = await getArtifactList();
+      const response = await getV1Artifact();
       
       if (response.data && Array.isArray(response.data)) {
         setArtifacts(response.data);
@@ -146,18 +145,16 @@ export default function Artifacts() {
     }
   }, []);
 
-  // ===== EFFECTS =====
   useEffect(() => {
     loadArtifacts();
   }, [loadArtifacts]);
 
-  // ===== FILTERING AND PAGINATION =====
   const filteredArtifacts = artifacts.filter((artifact) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      artifact.package.name.toLowerCase().includes(searchLower) ||
-      artifact.package.namespace.toLowerCase().includes(searchLower) ||
+      artifact.name.toLowerCase().includes(searchLower) ||
+      artifact.namespace.toLowerCase().includes(searchLower) ||
       artifact.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
       artifact.versionHash.toLowerCase().includes(searchLower)
     );
@@ -176,7 +173,6 @@ export default function Artifacts() {
     setCurrentPage(1); // Reset to first page when search changes
   };
 
-  // ===== UTILITY FUNCTIONS =====
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -224,19 +220,20 @@ export default function Artifacts() {
     try {
       configureClient();
 
-      await deleteArtifact({
-        body: {
-          package: artifactToDelete.package,
-          identifier: `hash:${artifactToDelete.versionHash}`
-        }
+      await deleteV1ArtifactByNamespaceByNameHashByHash({
+        path: {
+          namespace: artifactToDelete.namespace,
+          name: artifactToDelete.name,
+          hash: artifactToDelete.versionHash,
+        },
       });
 
-      toast.success(`Artifact "${artifactToDelete.package.name}" deleted successfully!`);
-      
+      toast.success(`Artifact "${artifactToDelete.name}" deleted successfully!`);
+
       // Close dialog and refresh the artifacts list
       setArtifactToDelete(null);
       await loadArtifacts();
-      
+
     } catch (error) {
       console.error("Delete artifact error:", error);
       const err = error as { status?: number; body?: { error?: string }; message?: string };
@@ -262,18 +259,29 @@ export default function Artifacts() {
       setUploading(true);
       configureClient();
 
+      const uploadResponse = await postV1ArtifactRawByNamespaceByName({
+        path: {
+          namespace: uploadNamespace.trim(),
+          name: uploadName.trim(),
+        },
+        body: uploadFile,
+      });
+
+      // If tags were provided, assign them via PATCH
       const tags = uploadTag.trim()
         ? uploadTag.split(",").map((t) => t.trim()).filter(Boolean)
         : undefined;
 
-      await postArtifactUpload({
-        body: {
-          namespace: uploadNamespace.trim(),
-          name: uploadName.trim(),
-          ...(tags ? { tag: tags } : {}),
-          file: uploadFile,
-        },
-      });
+      if (tags && tags.length > 0 && uploadResponse.data?.versionHash) {
+        await patchV1ArtifactByNamespaceByNameHashByHash({
+          path: {
+            namespace: uploadNamespace.trim(),
+            name: uploadName.trim(),
+            hash: uploadResponse.data.versionHash,
+          },
+          body: { tags },
+        });
+      }
 
       toast.success(`Artifact "${uploadName}" uploaded successfully!`);
       setUploadModalOpen(false);
@@ -311,8 +319,6 @@ export default function Artifacts() {
   };
 
 
-
-  // ===== RENDER =====
   if (!hasAccess) {
     return (
       <PageLayout title="Artifacts">
@@ -399,7 +405,7 @@ export default function Artifacts() {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {paginatedArtifacts.map((artifact) => (
               <Card
-                key={`${artifact.package.namespace}-${artifact.package.name}-${artifact.versionHash}`}
+                key={`${artifact.namespace}-${artifact.name}-${artifact.versionHash}`}
                 className="group hover:shadow-lg transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -407,7 +413,7 @@ export default function Artifacts() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <IconPackage className="h-5 w-5 text-primary shrink-0" />
                       <CardTitle className="text-base truncate">
-                        {artifact.package.name}
+                        {artifact.name}
                       </CardTitle>
                     </div>
                     <div className="flex gap-2 shrink-0">
@@ -425,14 +431,14 @@ export default function Artifacts() {
                   <div className="space-y-1 text-sm text-muted-foreground">
                     <div className="flex items-center justify-between">
                       <p className="truncate">
-                        <strong>Namespace:</strong> {artifact.package.namespace}
+                        <strong>Namespace:</strong> {artifact.namespace}
                       </p>
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() =>
-                          copyToClipboard(artifact.package.namespace, "Namespace")
+                          copyToClipboard(artifact.namespace, "Namespace")
                         }
                         title="Copy namespace"
                       >
@@ -442,7 +448,7 @@ export default function Artifacts() {
                     <div className="flex items-center justify-between">
                       <p className="truncate max-w-[180px] sm:max-w-[260px] md:max-w-[320px] break-all">
                         <strong>Package:</strong>{" "}
-                        {`${artifact.package.namespace}/${artifact.package.name}`}
+                        {`${artifact.namespace}/${artifact.name}`}
                       </p>
                       <Button
                         size="sm"
@@ -450,7 +456,7 @@ export default function Artifacts() {
                         className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() =>
                           copyToClipboard(
-                            `${artifact.package.namespace}/${artifact.package.name}`,
+                            `${artifact.namespace}/${artifact.name}`,
                             "Package"
                           )
                         }
@@ -463,22 +469,22 @@ export default function Artifacts() {
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  {/* Create Blueprint Button */}
+                  {/* Create Task Button */}
                   <Button
                     size="sm"
                     variant="default"
                     className="w-full"
                     onClick={() => {
-                      // Navigate to blueprint page with artifact data
-                      const artifactId = `${artifact.package.namespace}-${artifact.package.name}-${artifact.versionHash}`;
-                      navigate(`/blueprint/${encodeURIComponent(artifactId)}`, {
+                      // Navigate to task page with artifact data
+                      const artifactId = `${artifact.namespace}-${artifact.name}-${artifact.versionHash}`;
+                      navigate(`/task/new/${encodeURIComponent(artifactId)}`, {
                         state: { artifact },
                       });
                     }}
-                    title="Create Blueprint"
+                    title="Create Task"
                   >
                     <IconFileCode className="h-4 w-4 mr-2" />
-                    Create Blueprint
+                    Create Task
                   </Button>
 
                   {/* Version Hash */}
@@ -847,7 +853,7 @@ export default function Artifacts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Artifact</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{artifactToDelete?.package.name}"?
+              Are you sure you want to delete "{artifactToDelete?.name}"?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

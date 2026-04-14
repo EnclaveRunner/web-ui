@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState, useEffect, useCallback } from "react";
-import { getTasksList } from "../client";
+import { getV1Task } from "../client";
 import { client } from "../client/client.gen";
-import type { TaskState } from "../client/types.gen";
+import type { Task } from "../client/types.gen";
 import {
   IconActivity,
   IconAlertCircle,
@@ -80,7 +80,7 @@ function getTaskStatusBadge(state: string) {
   );
 }
 
-function TaskCard({ task }: { task: TaskState }) {
+function TaskCard({ task }: { task: Task }) {
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return '—';
     try {
@@ -98,20 +98,20 @@ function TaskCard({ task }: { task: TaskState }) {
     }
   };
 
-  const stage = TASK_STAGES[task.state] || TASK_STAGES.pending;
+  const stage = TASK_STAGES[task.status.state] || TASK_STAGES.pending;
 
   const stateTimestamp: string | undefined =
-    task.state === 'scheduled' ? task.next_process_at :
-    task.state === 'completed' ? task.completed_at :
-    task.state === 'retry'     ? task.last_failed_at :
-    task.state === 'archived'  ? task.last_failed_at :
+    task.status.state === 'scheduled' ? task.status.next_process_at :
+    task.status.state === 'completed' ? task.status.completed_at :
+    task.status.state === 'retry'     ? task.status.last_failed_at :
+    task.status.state === 'archived'  ? task.status.last_failed_at :
     undefined;
 
   const timestampLabel =
-    task.state === 'scheduled' ? 'Run at' :
-    task.state === 'completed' ? 'Completed' :
-    task.state === 'retry'     ? 'Last failed' :
-    task.state === 'archived'  ? 'Failed at' :
+    task.status.state === 'scheduled' ? 'Run at' :
+    task.status.state === 'completed' ? 'Completed' :
+    task.status.state === 'retry'     ? 'Last failed' :
+    task.status.state === 'archived'  ? 'Failed at' :
     'Time';
 
   return (
@@ -121,16 +121,16 @@ function TaskCard({ task }: { task: TaskState }) {
           <div className="font-mono text-sm font-medium truncate">
             {task.id.split('-')[0]}
           </div>
-          {getTaskStatusBadge(task.state)}
+          {getTaskStatusBadge(task.status.state)}
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="flex items-center gap-2">
             <IconActivity className="h-4 w-4 text-purple-500" />
-            <span className="font-medium">Retries: {task.retries}/{task.max_retries}</span>
+            <span className="font-medium">Retries: {task.status.retries}/{task.retries ?? '—'}</span>
           </div>
           <div className="flex items-center gap-2">
             <IconDatabase className="h-4 w-4 text-orange-500" />
-            <span className="font-medium">{task.retention}</span>
+            <span className="font-medium">{task.retention ?? '—'}</span>
           </div>
           {stateTimestamp && (
             <div className="col-span-2 flex items-center gap-2">
@@ -140,12 +140,12 @@ function TaskCard({ task }: { task: TaskState }) {
             </div>
           )}
         </div>
-        {(task.state === 'retry' || task.state === 'archived') && task.last_error && (
+        {(task.status.state === 'retry' || task.status.state === 'archived') && task.status.last_error && (
           <div className="mt-3 pt-2 border-t">
             <div className="flex items-start gap-2">
               <IconAlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
               <span className="text-xs text-red-600 dark:text-red-400 break-words line-clamp-2">
-                {task.last_error}
+                {task.status.last_error}
               </span>
             </div>
           </div>
@@ -155,10 +155,10 @@ function TaskCard({ task }: { task: TaskState }) {
   );
 }
 
-function TaskStageColumn({ stage, tasks, isLoading }: { 
-  stage: { name: string; color: string; icon: React.ReactNode; iconColor: string }, 
-  tasks: TaskState[], 
-  isLoading: boolean 
+function TaskStageColumn({ stage, tasks, isLoading }: {
+  stage: { name: string; color: string; icon: React.ReactNode; iconColor: string },
+  tasks: Task[],
+  isLoading: boolean
 }) {
   if (isLoading) {
     return (
@@ -211,7 +211,7 @@ function TaskStageColumn({ stage, tasks, isLoading }: {
 }
 
 export default function TaskOverview() {
-  const [tasks, setTasks] = useState<TaskState[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(() => new Date());
@@ -239,7 +239,7 @@ export default function TaskOverview() {
   const fetchTasks = useCallback(async () => {
     try {
       configureClient();
-      const response = await getTasksList();
+      const response = await getV1Task();
       
       // Check if the response indicates access denied
       if (response.response && !response.response.ok) {
@@ -311,17 +311,17 @@ export default function TaskOverview() {
 
   // Group tasks by state
   const tasksByState = tasks.reduce((acc, task) => {
-    const state = task.state || 'pending';
+    const state = task.status.state || 'pending';
     if (!acc[state]) acc[state] = [];
     acc[state].push(task);
     return acc;
-  }, {} as Record<string, TaskState[]>);
+  }, {} as Record<string, Task[]>);
 
   const totalTasks = tasks.length;
   const pendingTasks = (tasksByState.scheduled?.length || 0) + (tasksByState.pending?.length || 0);
   const activeTasks = tasksByState.active?.length || 0;
 
-  // ===== ACCESS DENIED STATE =====
+
   console.log('Access check - hasAccess:', hasAccess, 'loading:', loading);
   if (!hasAccess) {
     console.log('Showing access denied screen');
