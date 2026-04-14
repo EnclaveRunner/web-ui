@@ -36,6 +36,7 @@ export default function Settings() {
   const [name, setName] = useState(user?.name || "");
   const [displayName, setDisplayName] = useState(user?.displayName || "");
 
+  
   // Update form state when user data changes
   useEffect(() => {
     if (user) {
