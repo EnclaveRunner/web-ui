@@ -24,7 +24,6 @@ import {
   CartesianGrid,
 } from "recharts";
 
-
 /** Returns the ISO date string (YYYY-MM-DD) for a given date */
 function toDay(date: Date): string {
   return date.toISOString().slice(0, 10);
