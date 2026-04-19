@@ -116,16 +116,20 @@ export default function Artifacts() {
       }
 
       configureClient();
-      
-      const response = await getV1Artifact();
-      
-      if (response.data && Array.isArray(response.data)) {
-        setArtifacts(response.data);
-        setHasAccess(true);
-        toast.success(`Loaded ${response.data.length} artifacts`);
-      } else {
-        setArtifacts([]);
+
+      const all: Artifact[] = [];
+      const limit = 100;
+      let offset = 0;
+      while (true) {
+        const response = await getV1Artifact({ query: { limit, offset } });
+        if (!response.data || !Array.isArray(response.data)) break;
+        all.push(...response.data);
+        if (response.data.length < limit) break;
+        offset += limit;
       }
+      setArtifacts(all);
+      setHasAccess(true);
+      toast.success(`Loaded ${all.length} artifacts`);
     } catch (error: unknown) {
       console.error("Error loading artifacts:", error);
       const err = error as { status?: number; body?: { error?: string }; message?: string };

@@ -3,10 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
-import { getV1Task } from "../client";
+import { getV1Task, getV1TaskByIdLogs } from "../client";
 import { client } from "../client/client.gen";
-import type { Task } from "../client/types.gen";
+import type { Task, TaskLog } from "../client/types.gen";
 import {
   IconActivity,
   IconAlertCircle,
@@ -18,6 +24,8 @@ import {
   IconPlayerPlay,
   IconRefresh,
   IconRotate,
+  IconTerminal,
+  IconDownload,
 } from "@tabler/icons-react";
 
 const TASK_STAGES: { [key: string]: { name: string; color: string; icon: React.ReactNode; iconColor: string } } = {
@@ -80,7 +88,122 @@ function getTaskStatusBadge(state: string) {
   );
 }
 
-function TaskCard({ task }: { task: Task }) {
+
+function LogLevelBadge({ level }: { level: string }) {
+  const l = level.toLowerCase();
+  const styles: Record<string, string> = {
+    debug:   "bg-zinc-600 text-zinc-200",
+    info:    "bg-sky-700 text-sky-100",
+    warn:    "bg-amber-600 text-amber-100",
+    warning: "bg-amber-600 text-amber-100",
+    error:   "bg-red-700 text-red-100",
+    fatal:   "bg-red-900 text-red-200 font-bold",
+  };
+  const cls = styles[l] ?? "bg-zinc-700 text-zinc-300";
+  return (
+    <span className={`inline-block px-1.5 py-px rounded text-[10px] font-mono uppercase tracking-wide ${cls} shrink-0 select-none`}>
+      {level.slice(0, 5)}
+    </span>
+  );
+}
+
+
+function TaskLogDialog({ taskId, open, onClose }: { taskId: string | null; open: boolean; onClose: () => void }) {
+  const [logs, setLogs] = useState<TaskLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !taskId) return;
+    setLogsLoading(true);
+    setLogsError(null);
+    setLogs([]);
+    getV1TaskByIdLogs({ path: { id: taskId } })
+      .then((res) => {
+        if (res.data && Array.isArray(res.data)) setLogs(res.data);
+        else setLogs([]);
+      })
+      .catch(() => setLogsError("Failed to load logs."))
+      .finally(() => setLogsLoading(false));
+  }, [open, taskId]);
+
+  const formatTimestamp = (ts: string) => {
+    try {
+      const d = new Date(ts);
+      return d.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) +
+        "." + String(d.getMilliseconds()).padStart(3, "0");
+    } catch { return ts; }
+  };
+
+  const downloadLogs = () => {
+    if (!logs.length || !taskId) return;
+    const text = logs.map(l => `[${l.timestamp}] [${l.level.toUpperCase()}] [${l.issuer}] ${l.message}`).join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `task-${taskId.slice(0, 8)}-logs.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-3xl w-full p-0 bg-zinc-950 border-zinc-800 text-zinc-100 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-3 border-b border-zinc-800 flex flex-row items-center gap-3 pr-12">
+          <DialogTitle className="flex items-center gap-2 font-mono text-sm text-zinc-300 flex-1">
+            <IconTerminal className="h-4 w-4 text-emerald-400" />
+            <span className="text-emerald-400">task</span>
+            <span className="text-zinc-500">/</span>
+            <span className="text-zinc-300 font-normal">{taskId?.slice(0, 8) ?? "…"}</span>
+            <span className="text-zinc-500 font-normal">/logs</span>
+          </DialogTitle>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 shrink-0"
+            onClick={downloadLogs}
+            disabled={!logs.length}
+            title="Download logs"
+          >
+            <IconDownload className="h-4 w-4" />
+          </Button>
+        </DialogHeader>
+
+        <div className="h-[60vh] overflow-y-auto font-mono text-xs leading-relaxed p-4 space-y-0.5 scrollbar-thin">
+          {logsLoading && (
+            <div className="flex items-center gap-2 text-zinc-500 py-2">
+              <IconRefresh className="h-3.5 w-3.5 animate-spin" />
+              Loading logs…
+            </div>
+          )}
+          {logsError && (
+            <div className="text-red-400 py-2">{logsError}</div>
+          )}
+          {!logsLoading && !logsError && logs.length === 0 && (
+            <div className="text-zinc-600 py-2">No logs available for this task.</div>
+          )}
+          {logs.map((log, i) => (
+            <div key={i} className="flex items-start gap-2 group hover:bg-zinc-900/60 rounded px-1 py-0.5 -mx-1">
+              <span className="text-zinc-600 shrink-0 w-24">{formatTimestamp(log.timestamp)}</span>
+              <LogLevelBadge level={log.level} />
+              <span className="text-zinc-500 shrink-0 max-w-[100px] truncate" title={log.issuer}>{log.issuer}</span>
+              <span className="text-zinc-200 break-words min-w-0">{log.message}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Status bar */}
+        <div className="px-4 py-2 border-t border-zinc-800 flex items-center justify-between text-[10px] text-zinc-600 font-mono">
+          <span>{logs.length} line{logs.length !== 1 ? "s" : ""}</span>
+          <span className="text-zinc-700">{taskId}</span>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TaskCard({ task, onViewLogs }: { task: Task; onViewLogs: (id: string) => void }) {
   const formatTime = (timestamp?: string) => {
     if (!timestamp) return '—';
     try {
@@ -150,15 +273,27 @@ function TaskCard({ task }: { task: Task }) {
             </div>
           </div>
         )}
+        <div className="mt-3 pt-2 border-t">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full h-7 text-xs gap-1.5"
+            onClick={() => onViewLogs(task.id)}
+          >
+            <IconTerminal className="h-3.5 w-3.5" />
+            View Logs
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function TaskStageColumn({ stage, tasks, isLoading }: {
+function TaskStageColumn({ stage, tasks, isLoading, onViewLogs }: {
   stage: { name: string; color: string; icon: React.ReactNode; iconColor: string },
   tasks: Task[],
-  isLoading: boolean
+  isLoading: boolean,
+  onViewLogs: (id: string) => void,
 }) {
   if (isLoading) {
     return (
@@ -201,7 +336,7 @@ function TaskStageColumn({ stage, tasks, isLoading }: {
         ) : (
           <div className="space-y-1">
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard key={task.id} task={task} onViewLogs={onViewLogs} />
             ))}
           </div>
         )}
@@ -215,6 +350,7 @@ export default function TaskOverview() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(() => new Date());
+  const [logTaskId, setLogTaskId] = useState<string | null>(null);
 
   // Configure client function
   const configureClient = useCallback(() => {
@@ -239,57 +375,48 @@ export default function TaskOverview() {
   const fetchTasks = useCallback(async () => {
     try {
       configureClient();
-      const response = await getV1Task();
-      
-      // Check if the response indicates access denied
-      if (response.response && !response.response.ok) {
-        console.log('API response not ok:', response.response.status, response.response);
-        if (response.response.status === 403) {
-          console.log('Setting hasAccess to false due to response.ok === false and 403 status');
-          setHasAccess(false);
-          setTasks([]);
-          return;
+
+      const all: Task[] = [];
+      const limit = 100;
+      let offset = 0;
+      while (true) {
+        const response = await getV1Task({ query: { limit, offset } });
+
+        if (response.response && !response.response.ok) {
+          if (response.response.status === 403) {
+            setHasAccess(false);
+            setTasks([]);
+            return;
+          }
         }
+
+        if (!response.data || !Array.isArray(response.data)) break;
+        all.push(...response.data);
+        if (response.data.length < limit) break;
+        offset += limit;
       }
-      
-      if (response.data && Array.isArray(response.data)) {
-        setTasks(response.data);
-        setHasAccess(true); // Set access to true on successful response
-        console.log('Tasks loaded successfully, hasAccess set to true');
-      } else {
-        setTasks([]);
-      }
+      setTasks(all);
+      setHasAccess(true);
     } catch (error: unknown) {
-      console.error("Error fetching tasks:", error);
-      
-      // Try to extract status code from various possible error structures
-      const err = error as { 
-        status?: number; 
+      const err = error as {
+        status?: number;
         response?: { status?: number; ok?: boolean };
         body?: { error?: string };
       };
-      
+
       let status = err.status || err.response?.status;
-      
-      // If no status but response is not ok, assume access denied
       if (!status && err.response && err.response.ok === false) {
         status = 403;
       }
-      
-      console.log('Error status detected:', status, 'Full error:', err);
-      
+
       if (status === 403) {
-        console.log('Setting hasAccess to false due to 403 status');
         setHasAccess(false);
       } else if (status === 401) {
-        // Redirect to login for authentication issues
         window.location.assign("/login");
       } else if (!status) {
-        // If we can't determine status but got an error, assume access denied
-        console.log('No status code found, assuming access denied');
         setHasAccess(false);
       }
-      
+
       setTasks([]);
     } finally {
       setLoading(false);
@@ -322,9 +449,7 @@ export default function TaskOverview() {
   const activeTasks = tasksByState.active?.length || 0;
 
 
-  console.log('Access check - hasAccess:', hasAccess, 'loading:', loading);
   if (!hasAccess) {
-    console.log('Showing access denied screen');
     return (
       <PageLayout title="Task Overview">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -416,10 +541,17 @@ export default function TaskOverview() {
               stage={stage}
               tasks={tasksByState[stateKey] || []}
               isLoading={loading}
+              onViewLogs={setLogTaskId}
             />
           ))}
         </div>
       </div>
+
+      <TaskLogDialog
+        taskId={logTaskId}
+        open={logTaskId !== null}
+        onClose={() => setLogTaskId(null)}
+      />
     </PageLayout>
   );
 }
