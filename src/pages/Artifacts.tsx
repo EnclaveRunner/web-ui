@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -63,6 +63,12 @@ import {
 import { client } from "../client/client.gen";
 import type { Artifact } from "../client";
 
+type ArtifactPackage = {
+  namespace: string;
+  name: string;
+  versions: Artifact[]; // sorted newest first
+};
+
 export default function Artifacts() {
   const navigate = useNavigate();
 
@@ -71,6 +77,8 @@ export default function Artifacts() {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [hasAccess, setHasAccess] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  // key = "namespace/name", value = versionHash of selected version
+  const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({});
   const [artifactToDelete, setArtifactToDelete] = useState<Artifact | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadNamespace, setUploadNamespace] = useState("");
@@ -153,23 +161,63 @@ export default function Artifacts() {
     loadArtifacts();
   }, [loadArtifacts]);
 
-  const filteredArtifacts = artifacts.filter((artifact) => {
+  // Group flat artifacts into packages keyed by "namespace/name"
+  const packages = useMemo<ArtifactPackage[]>(() => {
+    const map = new Map<string, Artifact[]>();
+    for (const a of artifacts) {
+      const key = `${a.namespace}/${a.name}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(a);
+    }
+    return Array.from(map.entries()).map(([, versions]) => {
+      versions.sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      return { namespace: versions[0].namespace, name: versions[0].name, versions };
+    });
+  }, [artifacts]);
+
+  // When packages change, seed selectedVersions for any package not yet tracked
+  useEffect(() => {
+    setSelectedVersions((prev) => {
+      const next = { ...prev };
+      for (const pkg of packages) {
+        const key = `${pkg.namespace}/${pkg.name}`;
+        if (!next[key]) {
+          const latestTagged = pkg.versions.find((v) =>
+            (v.tags ?? []).some((t) => t.toLowerCase() === "latest")
+          );
+          next[key] = (latestTagged ?? pkg.versions[0]).versionHash;
+        }
+      }
+      return next;
+    });
+  }, [packages]);
+
+  const getSelectedVersion = (pkg: ArtifactPackage): Artifact => {
+    const key = `${pkg.namespace}/${pkg.name}`;
+    const hash = selectedVersions[key];
+    return pkg.versions.find((v) => v.versionHash === hash) ?? pkg.versions[0];
+  };
+
+  const filteredPackages = packages.filter((pkg) => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
-    return (
-      artifact.name.toLowerCase().includes(searchLower) ||
-      artifact.namespace.toLowerCase().includes(searchLower) ||
-      artifact.tags.some(tag => tag.toLowerCase().includes(searchLower)) ||
-      artifact.versionHash.toLowerCase().includes(searchLower)
+    return pkg.versions.some(
+      (v) =>
+        v.name.toLowerCase().includes(searchLower) ||
+        v.namespace.toLowerCase().includes(searchLower) ||
+        (v.tags ?? []).some((tag) => tag.toLowerCase().includes(searchLower)) ||
+        v.versionHash.toLowerCase().includes(searchLower)
     );
   });
 
   // Calculate pagination
-  const totalPages = Math.ceil(filteredArtifacts.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredPackages.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedArtifacts = filteredArtifacts.slice(startIndex, endIndex);
-  const showPagination = filteredArtifacts.length > ITEMS_PER_PAGE;
+  const paginatedPackages = filteredPackages.slice(startIndex, endIndex);
+  const showPagination = filteredPackages.length > ITEMS_PER_PAGE;
 
   // Handle search term change
   const handleSearchChange = (value: string) => {
@@ -203,9 +251,9 @@ export default function Artifacts() {
     }
   };
 
-  const getSortedTags = (tags: string[]) => {
+  const getSortedTags = (tags: string[] | null | undefined) => {
     // Sort tags alphabetically, but if there's a "latest" tag, put it first
-    const sortedTags = [...tags].sort();
+    const sortedTags = [...(tags ?? [])].sort();
     const latestIndex = sortedTags.findIndex(tag => tag.toLowerCase() === 'latest');
     if (latestIndex > 0) {
       const latestTag = sortedTags.splice(latestIndex, 1)[0];
@@ -233,6 +281,17 @@ export default function Artifacts() {
       });
 
       toast.success(`Artifact "${artifactToDelete.name}" deleted successfully!`);
+
+      // If the deleted version was selected, clear its selection so the next
+      // version gets auto-selected when packages recompute.
+      const pkgKey = `${artifactToDelete.namespace}/${artifactToDelete.name}`;
+      setSelectedVersions((prev) => {
+        if (prev[pkgKey] === artifactToDelete.versionHash) {
+          const { [pkgKey]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return prev;
+      });
 
       // Close dialog and refresh the artifacts list
       setArtifactToDelete(null);
@@ -299,7 +358,7 @@ export default function Artifacts() {
       const err = error as { status?: number; body?: { error?: string }; message?: string };
 
       if (err.status === 409) {
-        toast.error("An artifact with this name already exists.");
+        toast.error("A tag with this name is already assigned to another version.");
       } else if (err.status === 403 || err.status === 401) {
         toast.error("You don't have permission to upload artifacts.");
       } else if (err.status === 413) {
@@ -395,7 +454,7 @@ export default function Artifacts() {
             <IconRefresh className="h-8 w-8 text-muted-foreground mx-auto mb-4 animate-spin" />
             <p className="text-muted-foreground">Loading artifacts...</p>
           </div>
-        ) : filteredArtifacts.length === 0 ? (
+        ) : filteredPackages.length === 0 ? (
           <div className="text-center py-12">
             <IconPackage className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold mb-2">No artifacts found</h3>
@@ -407,9 +466,16 @@ export default function Artifacts() {
           </div>
         ) : (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {paginatedArtifacts.map((artifact) => (
+            {paginatedPackages.map((pkg) => {
+              const pkgKey = `${pkg.namespace}/${pkg.name}`;
+              const artifact = getSelectedVersion(pkg);
+              const sortedTags = getSortedTags(artifact.tags);
+              const versionLabel =
+                sortedTags.length > 0 ? sortedTags[0] : artifact.versionHash.slice(0, 8);
+
+              return (
               <Card
-                key={`${artifact.namespace}-${artifact.name}-${artifact.versionHash}`}
+                key={pkgKey}
                 className="group hover:shadow-lg transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -426,7 +492,7 @@ export default function Artifacts() {
                         variant="outline"
                         className="min-w-fit text-red-600 hover:text-red-700 hover:bg-red-50"
                         onClick={() => handleDeleteArtifact(artifact)}
-                        title="Delete Artifact"
+                        title="Delete selected version"
                       >
                         <IconTrash className="h-4 w-4" />
                       </Button>
@@ -479,7 +545,6 @@ export default function Artifacts() {
                     variant="default"
                     className="w-full"
                     onClick={() => {
-                      // Navigate to task page with artifact data
                       const artifactId = `${artifact.namespace}-${artifact.name}-${artifact.versionHash}`;
                       navigate(`/task/new/${encodeURIComponent(artifactId)}`, {
                         state: { artifact },
@@ -490,6 +555,61 @@ export default function Artifacts() {
                     <IconFileCode className="h-4 w-4 mr-2" />
                     Create Task
                   </Button>
+
+                  {/* Version selector */}
+                  <div className="flex items-center gap-2">
+                    <IconTag className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs justify-between min-w-0 flex-1"
+                        >
+                          <span className="truncate">{versionLabel}</span>
+                          <div className="flex items-center gap-1 ml-1 shrink-0">
+                            {pkg.versions.length > 1 && (
+                              <Badge variant="secondary" className="h-4 px-1 text-xs">
+                                {pkg.versions.length}
+                              </Badge>
+                            )}
+                            <IconChevronDown className="h-3 w-3" />
+                          </div>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        {pkg.versions.map((v) => {
+                          const vTags = getSortedTags(v.tags);
+                          const label =
+                            vTags.length > 0
+                              ? vTags.join(", ")
+                              : v.versionHash.slice(0, 12);
+                          const isSelected = v.versionHash === artifact.versionHash;
+                          return (
+                            <DropdownMenuItem
+                              key={v.versionHash}
+                              onClick={() =>
+                                setSelectedVersions((prev) => ({
+                                  ...prev,
+                                  [pkgKey]: v.versionHash,
+                                }))
+                              }
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between w-full gap-2">
+                                <span className="truncate text-xs">{label}</span>
+                                {isSelected && (
+                                  <Badge variant="default" className="h-4 px-1 text-xs shrink-0">
+                                    selected
+                                  </Badge>
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
 
                   {/* Version Hash */}
                   <div className="flex items-center gap-2">
@@ -525,74 +645,10 @@ export default function Artifacts() {
                       {formatPulls(artifact.pulls)} pulls
                     </span>
                   </div>
-
-                  {/* Tags */}
-                  {artifact.tags.length > 0 && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <IconTag className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          Tags
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 text-xs justify-between min-w-0"
-                            >
-                              <span className="truncate">
-                                {getSortedTags(artifact.tags)[0]}
-                              </span>
-                              {artifact.tags.length > 1 && (
-                                <div className="flex items-center gap-1 ml-1">
-                                  <Badge
-                                    variant="secondary"
-                                    className="h-4 px-1 text-xs"
-                                  >
-                                    +{artifact.tags.length - 1}
-                                  </Badge>
-                                  <IconChevronDown className="h-3 w-3" />
-                                </div>
-                              )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-48">
-                            {getSortedTags(artifact.tags).map((tag) => (
-                              <DropdownMenuItem
-                                key={tag}
-                                onClick={() => copyToClipboard(tag, "Tag")}
-                                className="cursor-pointer"
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="truncate">{tag}</span>
-                                  <IconCopy className="h-3 w-3 text-muted-foreground" />
-                                </div>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        {artifact.tags.length === 1 && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0"
-                            onClick={() =>
-                              copyToClipboard(artifact.tags[0], "Tag")
-                            }
-                            title="Copy tag"
-                          >
-                            <IconCopy className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -699,19 +755,19 @@ export default function Artifacts() {
         )}
 
         {/* Results Summary */}
-        {!loading && artifacts.length > 0 && (
+        {!loading && packages.length > 0 && (
           <div className="text-center text-sm text-muted-foreground">
             {showPagination ? (
               <>
                 Showing {startIndex + 1}-
-                {Math.min(endIndex, filteredArtifacts.length)} of{" "}
-                {filteredArtifacts.length} artifacts
+                {Math.min(endIndex, filteredPackages.length)} of{" "}
+                {filteredPackages.length} packages
                 {searchTerm && ` matching "${searchTerm}"`}
               </>
             ) : (
               <>
-                Showing {filteredArtifacts.length} of {artifacts.length}{" "}
-                artifacts
+                Showing {filteredPackages.length} of {packages.length}{" "}
+                packages
                 {searchTerm && ` matching "${searchTerm}"`}
               </>
             )}
@@ -774,6 +830,26 @@ export default function Artifacts() {
               <p className="text-xs text-muted-foreground">
                 Optional. Separate multiple tags with commas.
               </p>
+              {(() => {
+                const ns = uploadNamespace.trim();
+                const nm = uploadName.trim();
+                const enteredTags = uploadTag.split(",").map((t) => t.trim()).filter(Boolean);
+                if (!ns || !nm || enteredTags.length === 0) return null;
+                const conflicting = enteredTags.filter((tag) =>
+                  artifacts.some(
+                    (a) =>
+                      a.namespace === ns &&
+                      a.name === nm &&
+                      (a.tags ?? []).some((t) => t === tag)
+                  )
+                );
+                if (conflicting.length === 0) return null;
+                return (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Warning: {conflicting.length === 1 ? `Tag "${conflicting[0]}" is` : `Tags ${conflicting.map((t) => `"${t}"`).join(", ")} are`} already used for an artifact in <strong>{ns}/{nm}</strong>.
+                  </p>
+                );
+              })()}
             </div>
 
             {/* File */}
