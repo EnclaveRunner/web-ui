@@ -22,7 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export default function Settings() {
   const {
@@ -33,17 +33,8 @@ export default function Settings() {
   } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordLoading, setIsPasswordLoading] = useState(false);
-  const [name, setName] = useState(user?.name || "");
-  const [displayName, setDisplayName] = useState(user?.displayName || "");
-
-  
-  // Update form state when user data changes
-  useEffect(() => {
-    if (user) {
-      setName(user.name);
-      setDisplayName(user.displayName);
-    }
-  }, [user]);
+  const [name] = useState(() => user?.name ?? "");
+  const [displayName, setDisplayName] = useState(() => user?.displayName ?? "");
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");

@@ -373,20 +373,17 @@ export default function Task() {
   const [retries, setRetries] = useState<string>("");
   const [retention, setRetention] = useState("");
   const [callback, setCallback] = useState("");
-  const [args, setArgs] = useState<string[]>([""]);
-  const [envVars, setEnvVars] = useState<{ key: string; value: string }[]>([{ key: "", value: "" }]);
+  const nextIdRef = useRef(1);
+  const [args, setArgs] = useState<{ id: number; value: string }[]>([{ id: 0, value: "" }]);
+  const [envVars, setEnvVars] = useState<{ id: number; key: string; value: string }[]>([{ id: 0, key: "", value: "" }]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!artifact) return;
-    const interfacePart = interfaceName.trim() || DEFAULT_INTERFACE;
-    const functionPart = fnName.trim() || DEFAULT_FUNCTION;
-    setSource(
-      `${artifact.namespace}:${artifact.name}/${interfacePart}/${functionPart}@hash:${artifact.versionHash}`
-    );
-  }, [artifact, interfaceName, fnName]);
+  const buildSource = (iface: string, fn: string) =>
+    artifact
+      ? `${artifact.namespace}:${artifact.name}/${iface.trim() || DEFAULT_INTERFACE}/${fn.trim() || DEFAULT_FUNCTION}@hash:${artifact.versionHash}`
+      : "";
 
   const configureClient = useCallback(() => {
     const stored = localStorage.getItem("enclave_credentials");
@@ -437,7 +434,7 @@ export default function Task() {
         .filter((e) => e.key.trim())
         .map((e) => ({ key: e.key.trim(), value: e.value }));
 
-      const taskArgs: string[] = args.filter((a) => a.trim());
+      const taskArgs: string[] = args.filter((a) => a.value.trim()).map((a) => a.value);
 
       const response = await postV1Task({
         body: {
@@ -471,21 +468,21 @@ export default function Task() {
     setRetries("");
     setRetention("");
     setCallback("");
-    setArgs([""]);
-    setEnvVars([{ key: "", value: "" }]);
+    setArgs([{ id: nextIdRef.current++, value: "" }]);
+    setEnvVars([{ id: nextIdRef.current++, key: "", value: "" }]);
   };
 
   // ── Env var helpers
-  const addEnvVar = () => setEnvVars((prev) => [...prev, { key: "", value: "" }]);
-  const removeEnvVar = (i: number) => setEnvVars((prev) => prev.filter((_, idx) => idx !== i));
-  const updateEnvVar = (i: number, field: "key" | "value", val: string) =>
-    setEnvVars((prev) => prev.map((e, idx) => (idx === i ? { ...e, [field]: val } : e)));
+  const addEnvVar = () => setEnvVars((prev) => [...prev, { id: nextIdRef.current++, key: "", value: "" }]);
+  const removeEnvVar = (id: number) => setEnvVars((prev) => prev.filter((e) => e.id !== id));
+  const updateEnvVar = (id: number, field: "key" | "value", val: string) =>
+    setEnvVars((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: val } : e)));
 
   // ── Arg helpers
-  const addArg = () => setArgs((prev) => [...prev, ""]);
-  const removeArg = (i: number) => setArgs((prev) => prev.filter((_, idx) => idx !== i));
-  const updateArg = (i: number, val: string) =>
-    setArgs((prev) => prev.map((a, idx) => (idx === i ? val : a)));
+  const addArg = () => setArgs((prev) => [...prev, { id: nextIdRef.current++, value: "" }]);
+  const removeArg = (id: number) => setArgs((prev) => prev.filter((a) => a.id !== id));
+  const updateArg = (id: number, val: string) =>
+    setArgs((prev) => prev.map((a) => (a.id === id ? { ...a, value: val } : a)));
 
   return (
     <PageLayout title="Create Task">
@@ -577,14 +574,20 @@ export default function Task() {
                 <Input
                   id="function"
                   value={fnName}
-                  onChange={(e) => setFnName(e.target.value)}
+                  onChange={(e) => {
+                    setFnName(e.target.value);
+                    setSource(buildSource(interfaceName, e.target.value));
+                  }}
                   placeholder="<function>"
                 />
                 <Label htmlFor="interface">Interface</Label>
                 <Input
                   id="interface"
                   value={interfaceName}
-                  onChange={(e) => setInterfaceName(e.target.value)}
+                  onChange={(e) => {
+                    setInterfaceName(e.target.value);
+                    setSource(buildSource(e.target.value, fnName));
+                  }}
                   placeholder="<interface>"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -681,13 +684,13 @@ export default function Task() {
               ) : (
                 <div className="space-y-2">
                   {args.map((arg, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={arg.id} className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground font-mono w-6 text-right shrink-0">
                         {i}
                       </span>
                       <Input
-                        value={arg}
-                        onChange={(e) => updateArg(i, e.target.value)}
+                        value={arg.value}
+                        onChange={(e) => updateArg(arg.id, e.target.value)}
                         placeholder={`arg ${i}`}
                         className="font-mono text-sm"
                       />
@@ -696,7 +699,7 @@ export default function Task() {
                         variant="ghost"
                         size="icon"
                         className="shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeArg(i)}
+                        onClick={() => removeArg(arg.id)}
                       >
                         <IconTrash className="h-4 w-4" />
                       </Button>
@@ -746,21 +749,21 @@ export default function Task() {
                       Value
                     </span>
                   </div>
-                  {envVars.map((env, i) => (
+                  {envVars.map((env) => (
                     <div
-                      key={i}
+                      key={env.id}
                       className="grid grid-cols-[1fr_1fr_2rem] gap-2 items-center"
                     >
                       <Input
                         value={env.key}
-                        onChange={(e) => updateEnvVar(i, "key", e.target.value)}
+                        onChange={(e) => updateEnvVar(env.id, "key", e.target.value)}
                         placeholder="KEY"
                         className="font-mono text-sm"
                       />
                       <Input
                         value={env.value}
                         onChange={(e) =>
-                          updateEnvVar(i, "value", e.target.value)
+                          updateEnvVar(env.id, "value", e.target.value)
                         }
                         placeholder="value"
                         className="font-mono text-sm"
@@ -770,7 +773,7 @@ export default function Task() {
                         variant="ghost"
                         size="icon"
                         className="text-muted-foreground hover:text-destructive"
-                        onClick={() => removeEnvVar(i)}
+                        onClick={() => removeEnvVar(env.id)}
                       >
                         <IconTrash className="h-4 w-4" />
                       </Button>

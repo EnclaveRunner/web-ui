@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { toast } from "sonner";
 import {
   getV1UserMe,
@@ -159,19 +159,13 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Check for existing session on mount
-  useEffect(() => {
+  const [user, setUser] = useState<User | null>(() => {
     const storedUser = localStorage.getItem(STORAGE_KEYS.USER);
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      // Configure client with stored credentials
-      configureClient();
-    }
-    setIsLoading(false);
-  }, []);
+    const initialUser = storedUser ? JSON.parse(storedUser) : null;
+    if (initialUser) configureClient();
+    return initialUser;
+  });
+  const [isLoading, setIsLoading] = useState(false);
 
   const login = async (
     username: string,

@@ -114,17 +114,29 @@ function TaskLogDialog({ taskId, open, onClose }: { taskId: string | null; open:
   const [logsError, setLogsError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || !taskId) return;
-    setLogsLoading(true);
-    setLogsError(null);
-    setLogs([]);
-    getV1TaskByIdLogs({ path: { id: taskId } })
-      .then((res) => {
-        if (res.data && Array.isArray(res.data)) setLogs(res.data);
-        else setLogs([]);
-      })
-      .catch(() => setLogsError("Failed to load logs."))
-      .finally(() => setLogsLoading(false));
+    if (!open || !taskId) {
+      return;
+    }
+
+    const fetchLogs = async () => {
+      setLogsLoading(true);
+      setLogsError(null);
+      setLogs([]);
+      try {
+        const res = await getV1TaskByIdLogs({ path: { id: taskId } });
+        if (res.data && Array.isArray(res.data)) {
+          setLogs(res.data);
+        } else {
+          setLogs([]);
+        }
+      } catch {
+        setLogsError("Failed to load logs.");
+      } finally {
+        setLogsLoading(false);
+      }
+    };
+
+    fetchLogs();
   }, [open, taskId]);
 
   const formatTimestamp = (ts: string) => {
@@ -184,7 +196,7 @@ function TaskLogDialog({ taskId, open, onClose }: { taskId: string | null; open:
             <div className="text-zinc-600 py-2">No logs available for this task.</div>
           )}
           {logs.map((log, i) => (
-            <div key={i} className="flex items-start gap-2 group hover:bg-zinc-900/60 rounded px-1 py-0.5 -mx-1">
+            <div key={`${log.timestamp}-${log.issuer}-${i}`} className="flex items-start gap-2 group hover:bg-zinc-900/60 rounded px-1 py-0.5 -mx-1">
               <span className="text-zinc-600 shrink-0 w-24">{formatTimestamp(log.timestamp)}</span>
               <LogLevelBadge level={log.level} />
               <span className="text-zinc-500 shrink-0 max-w-[100px] truncate" title={log.issuer}>{log.issuer}</span>

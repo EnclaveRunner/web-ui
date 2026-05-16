@@ -78,7 +78,7 @@ export default function Artifacts() {
   const [hasAccess, setHasAccess] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   // key = "namespace/name", value = versionHash of selected version
-  const [selectedVersions, setSelectedVersions] = useState<Record<string, string>>({});
+  const [manualSelections, setManualSelections] = useState<Record<string, string>>({});
   const [artifactToDelete, setArtifactToDelete] = useState<Artifact | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadNamespace, setUploadNamespace] = useState("");
@@ -177,22 +177,22 @@ export default function Artifacts() {
     });
   }, [artifacts]);
 
-  // When packages change, seed selectedVersions for any package not yet tracked
-  useEffect(() => {
-    setSelectedVersions((prev) => {
-      const next = { ...prev };
-      for (const pkg of packages) {
-        const key = `${pkg.namespace}/${pkg.name}`;
-        if (!next[key]) {
-          const latestTagged = pkg.versions.find((v) =>
-            (v.tags ?? []).some((t) => t.toLowerCase() === "latest")
-          );
-          next[key] = (latestTagged ?? pkg.versions[0]).versionHash;
-        }
+  // Compute selectedVersions: use manual selection if set, otherwise default to the latest-tagged version
+  const selectedVersions = useMemo(() => {
+    const result: Record<string, string> = {};
+    for (const pkg of packages) {
+      const key = `${pkg.namespace}/${pkg.name}`;
+      if (manualSelections[key]) {
+        result[key] = manualSelections[key];
+      } else {
+        const latestTagged = pkg.versions.find((v) =>
+          (v.tags ?? []).some((t) => t.toLowerCase() === "latest")
+        );
+        result[key] = (latestTagged ?? pkg.versions[0]).versionHash;
       }
-      return next;
-    });
-  }, [packages]);
+    }
+    return result;
+  }, [packages, manualSelections]);
 
   const getSelectedVersion = (pkg: ArtifactPackage): Artifact => {
     const key = `${pkg.namespace}/${pkg.name}`;
@@ -285,12 +285,11 @@ export default function Artifacts() {
       // If the deleted version was selected, clear its selection so the next
       // version gets auto-selected when packages recompute.
       const pkgKey = `${artifactToDelete.namespace}/${artifactToDelete.name}`;
-      setSelectedVersions((prev) => {
-        if (prev[pkgKey] === artifactToDelete.versionHash) {
-          const { [pkgKey]: _removed, ...rest } = prev;
-          return rest;
-        }
-        return prev;
+      setManualSelections((prev) => {
+        if (prev[pkgKey] === undefined) return prev;
+        const next = { ...prev };
+        delete next[pkgKey];
+        return next;
       });
 
       // Close dialog and refresh the artifacts list
@@ -589,7 +588,7 @@ export default function Artifacts() {
                             <DropdownMenuItem
                               key={v.versionHash}
                               onClick={() =>
-                                setSelectedVersions((prev) => ({
+                                setManualSelections((prev) => ({
                                   ...prev,
                                   [pkgKey]: v.versionHash,
                                 }))

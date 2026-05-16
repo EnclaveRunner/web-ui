@@ -146,7 +146,7 @@ function TaskHeatmap({ data, loading }: { data: { day: string; count: number }[]
               {dayLabels.map((lbl, row) =>
                 lbl ? (
                   <text
-                    key={row}
+                    key={lbl}
                     x={0}
                     y={18 + row * STEP + CELL * 0.75}
                     fontSize={9}
@@ -186,8 +186,8 @@ function TaskHeatmap({ data, loading }: { data: { day: string; count: number }[]
             {/* Legend */}
             <div className="flex items-center gap-1.5 mt-2 justify-end">
               <span className="text-[10px] text-muted-foreground">Less</span>
-              {[0, 0.2, 0.5, 0.8, 1].map((v, i) => (
-                <svg key={i} width={CELL} height={CELL}>
+              {[0, 0.2, 0.5, 0.8, 1].map((v) => (
+                <svg key={v} width={CELL} height={CELL}>
                   <rect
                     width={CELL} height={CELL} rx={3}
                     fill={v === 0 ? undefined : cellColor(Math.ceil(v * max))}
