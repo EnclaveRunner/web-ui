@@ -55,7 +55,7 @@
   "devDependencies": {
     "@eslint-react/eslint-plugin": "^2.2.4",
     "@eslint/js": "^9.36.0",
-    "@hey-api/openapi-ts": "^0.88.0",
+    "@hey-api/openapi-ts": "^0.99.0",
     "@types/node": "^24.8.1",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
